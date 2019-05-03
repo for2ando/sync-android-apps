@@ -9,7 +9,7 @@ test $# -ne 0 && { echo "$usage"; exit 1;}
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 
-source "$dname/adb-getdev.sh"
+source "$dname/parse-adbdev.sh"
 
 test -z "$APPDIR" && { echo "Please set envvar: APPDIR.">&2; exit 2;}
 test -d "$APPDIR"/apps ||
@@ -18,7 +18,7 @@ test -r "$APPDIR"/@list ||
   { echo "$APPDIR/@list: no such a file.">&2; exit 4;}
 
 adev="$(adb devices -l)"
-dev=$(echo "$adev" | adb-getdev model) || exit 11
+dev=$(echo "$adev" | parse-adbdev model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
 log="log-put-$dev-$stamp"
 

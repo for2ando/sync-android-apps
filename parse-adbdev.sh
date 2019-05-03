@@ -1,6 +1,7 @@
 #!/bin/bash
 
-adb-getdev() {
+parse-adbdev() {
+  pname=${FUNCNAME[0]}
   usage="$pname [Keyword]
   $pname {-h|--help}
     keyword:
