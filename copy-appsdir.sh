@@ -5,8 +5,7 @@ $pname  {-h|--help}"
 quietp=false
 while true; do
   case "$1" in
-  -q|--quiet)
-  -s|--silent) quietp=true; shift;;
+  -q|--quiet|-s|--silent) quietp=true; shift;;
   -*) echo "$usage"; exit 1;;
   *) break;;
   esac

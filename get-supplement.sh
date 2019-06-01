@@ -1,14 +1,13 @@
 #!/bin/bash
 pname=$(basename "$0")
-usage="$pname [-l|--listonly|-q|--quiet|-s|--silent]"
+usage="$pname [-l|--listonly|-q|--quiet|-s|--silent]
 $pname {-h|--help}"
 listonlyp=false
 quietp=false
 while true; do
   case "$1" in
   -l|--listonly) listonlyp=true; shift;;
-  -q|--quiet)
-  -s|--silent) quietp=true; shift;;
+  -q|--quiet|-s|--silent) quietp=true; shift;;
   -*) echo "$usage"; exit 1;;
   *) break;;
   esac
@@ -18,10 +17,10 @@ test $# -ne 0 && { echo "$usage"; exit 1;}
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 
-source "$dname/parse-adbdev.sh"
+source "$dname/adb-parsedev.sh"
 
 adev="$(adb devices -l)"
-dev=$(echo "$adev" | parse-adbdev model) || exit 11
+dev=$(echo "$adev" | adb-parsedev model) || exit 11
 $quietp || echo "device: $dev">&2
 stamp=$(date +%Y%m%d-%H%M%S)
 $quietp || echo "timestamp: $stamp">&2
@@ -121,9 +120,8 @@ log="log-get-$dev-$stamp"
         fgrep ".$obj" ../"$filetoget" >"$tFiletoget"
         mapfile -t files <"$tFiletoget"
         get-android-apps $obj "${files[@]}"
-        done
-        rm -f "$tFiletoget"
       done
+      rm -f "$tFiletoget"
       cd ..
       cp -p "$pkglist" "$pkglist-$dev-$stamp"
     fi

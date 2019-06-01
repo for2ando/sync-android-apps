@@ -1,6 +1,6 @@
 #!/bin/bash
 
-parse-adbdev() {
+adb-parsedev() {
   pname=${FUNCNAME[0]}
   usage="$pname [Keyword]
   $pname {-h|--help}
@@ -52,7 +52,7 @@ test "$(caller)" = "0 NULL" && {
   pname=$(basename "$0")
   case "$pname" in
   adb-getdev.sh)
-    adb-getdev "$@"
+    adb-parsedev "$@"
     exit $?;;
   esac
 }
