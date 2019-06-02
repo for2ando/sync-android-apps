@@ -17,19 +17,18 @@ test $# -ne 0 && { echo "$usage"; exit 1;}
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 
-source "$dname/adb-parsedev.sh"
-
 adev="$(adb devices -l)"
 dev=$(echo "$adev" | adb-parsedev model) || exit 11
 $quietp || echo "device: $dev">&2
 stamp=$(date +%Y%m%d-%H%M%S)
 $quietp || echo "timestamp: $stamp">&2
 log="log-get-$dev-$stamp"
+$listonlyp && log="log-getlist-$dev-$stamp"
 
 (
   pkglist=@list
   blacklist=@blacklist
-  pkgorig=@pkgorig
+  pkgondev=@pkgondev
   pkgtoget=@pkgtoget
   filetoget=@filetoget
   
@@ -43,11 +42,11 @@ log="log-get-$dev-$stamp"
   $quietp || echo "**** compute supplements based on packages.">&2
   tPkgtoget_candidate=$(mktemp $pname.XXXXXXXX)
   trap "rm -f '$tPkgtoget_candidate'" 1 2 3 15 EXIT ERR
-  $quietp || echo "make $pkgorig: pkg-list on the device.">&2
-  get-android-apps list -3 >"$pkgorig" ||
-    { echo "get-android-apps -list: failed.">&2; rm -f "$pkgorig"; exit 5;}
+  $quietp || echo "make $pkgondev: pkg-list on the device.">&2
+  get-android-apps list -3 >"$pkgondev" ||
+    { echo "get-android-apps -list: failed.">&2; rm -f "$pkgondev"; exit 5;}
   $quietp || echo "make $pkgtoget: list of supplement pkgs.">&2
-  set-complement "$pkgorig" "$pkglist" >"$tPkgtoget_candidate" ||
+  set-complement "$pkgondev" "$pkglist" >"$tPkgtoget_candidate" ||
     { echo "set-complement: failed.">&2;  exit 6;}
   if test -r "$blacklist"; then
     $quietp || echo "apply $blacklist to $pkgtoget.">&2
@@ -59,28 +58,32 @@ log="log-get-$dev-$stamp"
   fi
   trap - 1 2 3 15 EXIT ERR
 
-  $listonlyp || {
+  if ! $listonlyp; then
     if test $(cat "$pkgtoget" | wc -l) -eq 0; then
       echo "No packages to get.">&2
     else
       cd apps
-      
       for obj in apk ab; do
         $quietp || echo "get $obj files of $pkgtoget pkgs.">&2
         get-android-apps $obj $(cat ../"$pkgtoget")
       done
       cd ..
-      #mv "$pkglist" "$pkglist-$dev-$stamp"
+      mv "$pkglist" "$pkglist-pre-$dev-$stamp"
     fi
-  }
-  mv "$pkgtoget" "$pkgtoget-$dev-$stamp"
+    mv "$pkgtoget" "$pkgtoget-$dev-$stamp"
+  else
+    echo -------- Packages to get:
+    cat "$pkgtoget"
+    echo -------- end of Packages to get:
+    rm "$pkgtoget"
+  fi
 
   $quietp || echo "**** compute supplements based on files.">&2
   tPkgtochk_candidate=$(mktemp $pname.XXXXXXXX)
   tPkgtochk_last=$(mktemp $pname.XXXXXXXX)
   trap "rm -f '$tPkgtochk_candidate' '$tPkgtochk_last'" 1 2 3 15 EXIT ERR
   $quietp || echo "make list of exist pkgs both on the device and the appdir.">&2
-  set-product "$pkgorig" "$pkglist" >"$tPkgtochk_candidate" ||
+  set-product "$pkgondev" "$pkglist" >"$tPkgtochk_candidate" ||
     { echo "set-product: failed.">&2;  exit 16;}
   if test -r "$blacklist"; then
     $quietp || echo "apply $blacklist to the list.">&2
@@ -107,12 +110,11 @@ log="log-get-$dev-$stamp"
   set-complement "$tFileorig" "$tFilelist" >"$filetoget" ||
     { echo "set-complement: failed.">&2;  exit 18;}
   
-  $listonlyp || {
+  if ! $listonlyp; then
     if test $(cat "$filetoget" | wc -l) -eq 0; then
       echo "No files to get.">&2
     else
       cd apps
-      
       tFiletoget=$(mktemp $pname.XXXXXXXX)
       trap "rm -f '$tFiletoget' '$tPkgtochk_last' '$tFilelist' '$tFileorig'" 1 2 3 15 EXIT ERR
       for obj in apk ab; do
@@ -125,14 +127,22 @@ log="log-get-$dev-$stamp"
       cd ..
       cp -p "$pkglist" "$pkglist-$dev-$stamp"
     fi
-  }
-  mv "$filetoget" "$filetoget-$dev-$stamp"
+    mv "$filetoget" "$filetoget-$dev-$stamp"
+  else
+    echo -------- Files to get:
+    cat "$filetoget"
+    echo -------- end of Files to get:
+    rm "$filetoget"
+  fi
   rm -f "$tPkgtochk_last" "$tFilelist" "$tFileorig"
   trap - 1 2 3 15 EXIT ERR
 
-  mv "$pkgorig" "$pkgorig-$dev-$stamp"
-
-  "$dname"/make-list.sh ||
-    { echo "make-list.sh: failed.">&2; exit 32;}
-  #"$dname"/make-withname.sh
+  if $listonlyp; then
+    rm "$pkgondev"
+  else
+    mv "$pkgondev" "$pkgondev-$dev-$stamp"
+    "$dname"/make-list.sh ||
+      { echo "make-list.sh: failed.">&2; exit 32;}
+    #"$dname"/make-withname.sh
+  fi
 ) 2>&1 | tee "$log"
