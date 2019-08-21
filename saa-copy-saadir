@@ -1,0 +1,64 @@
+#!/bin/sh
+pname=$(basename "$0")
+usage="$pname  [-q|--quiet|-s|--silent|-v|--verbose|-n|--dryrun] SourceSAADir NewSAADir
+$pname  {-h|--help}
+Options:
+  -q|--quiet|-s|--silent
+    No messages are displayed, except error message.
+  -v|--verbose
+    Additional messages are displayed. It has precedence over -q|--quiet|-s|--silent.
+  -n|--dryrun
+    Only messages displayed, No SAADirectory is made.
+  -h|--help
+    This help message is displayed."
+quietp=false
+verbosep=false
+drurunp=false
+while true; do
+  case "$1" in
+  -q|--quiet|-s|--silent) quietp=true; shift;;
+  -n|--dryrun) dryrunp=true; shift;;
+  -v|--verbose) verbosep=true; shift;;
+  -h|--help) echo "$usage"; exit 0;;
+  -*) echo "$usage"; exit 1;;
+  *) break;;
+  esac
+done
+test $# -ne 2 && { echo "$pname: missing arguments.">&2; echo "$usage"; exit 1;}
+$verbosep && {
+  quietp=false
+  lnopt=--verbose
+}
+
+dname=$(dirname "$0")
+case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+
+saadir="$1"
+newsaadir="$2"
+appsdir=apps
+pkgblacklist=@blacklist
+
+test -d "$saadir" ||
+  { echo "$saadir: source directory not exist.">&2; exit 2;}
+test -d "$newsaadir" &&
+  { echo "$newsaadir: the destination directory exists. Remove it and retry.">&2; exit 2;}
+$quietp || echo "make $newsaadir.">&2
+mkdir -p "$newsaadir"/"$appsdir" ||
+  { echo "$newsaadir/$appsdir: mkdir failed.">&2; exit 3;}
+for obj in apk ab; do
+  $quietp || echo "make hardlinks for $obj.">&2
+  ln${lnopt:+ $lnopt} "$saadir"/"$appsdir"/*.$obj "$newsaadir"/"$appsdir" ||
+    { echo "$pname: abort.">&2; exit 4;}
+done
+
+(
+  cd "$newsaadir"
+  $quietp || echo "make @list.">&2
+  "$dname"/saa-make-list ||
+    { echo "$pname: abort.">&2; exit 5; }
+  #"$dname"/saa-make-desc ||
+  #  { echo "$pname: abort.">&2; exit 6; }
+)
+$quietp || echo "copy $pkgblacklist.">&2
+cp "$saadir"/"$pkgblacklist" "$newsaadir"/ ||
+  { echo "$pname: abort.">&2; exit 7; }

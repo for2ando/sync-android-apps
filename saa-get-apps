@@ -18,14 +18,14 @@ dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 
 adev="$(adb devices -l)"
-dev=$(echo "$adev" | adb-parsedev model) || exit 11
-$quietp || echo "device: $dev">&2
+dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
-$quietp || echo "timestamp: $stamp">&2
 log="log-get-$dev-$stamp"
 $listonlyp && log="log-getlist-$dev-$stamp"
 
 (
+  $quietp || echo "device: $dev">&2
+  $quietp || echo "timestamp: $stamp">&2
   pkglist=@list
   blacklist=@blacklist
   pkgondev=@pkgondev
@@ -58,7 +58,12 @@ $listonlyp && log="log-getlist-$dev-$stamp"
   fi
   trap - 1 2 3 15 EXIT ERR
 
-  if ! $listonlyp; then
+  if $listonlyp; then
+    echo -------- Packages to get:
+    cat "$pkgtoget"
+    echo -------- end of Packages to get:
+    rm "$pkgtoget"
+  else
     if test $(cat "$pkgtoget" | wc -l) -eq 0; then
       echo "No packages to get.">&2
     else
@@ -68,14 +73,9 @@ $listonlyp && log="log-getlist-$dev-$stamp"
         get-android-apps $obj $(cat ../"$pkgtoget")
       done
       cd ..
-      mv "$pkglist" "$pkglist-pre-$dev-$stamp"
+      cp -p "$pkglist" "$pkglist-pre-$dev-$stamp"
     fi
     mv "$pkgtoget" "$pkgtoget-$dev-$stamp"
-  else
-    echo -------- Packages to get:
-    cat "$pkgtoget"
-    echo -------- end of Packages to get:
-    rm "$pkgtoget"
   fi
 
   $quietp || echo "**** compute supplements based on files.">&2
@@ -110,7 +110,12 @@ $listonlyp && log="log-getlist-$dev-$stamp"
   set-complement "$tFileorig" "$tFilelist" >"$filetoget" ||
     { echo "set-complement: failed.">&2;  exit 18;}
   
-  if ! $listonlyp; then
+  if $listonlyp; then
+    echo -------- Files to get:
+    cat "$filetoget"
+    echo -------- end of Files to get:
+    rm "$filetoget"
+  else
     if test $(cat "$filetoget" | wc -l) -eq 0; then
       echo "No files to get.">&2
     else
@@ -128,11 +133,6 @@ $listonlyp && log="log-getlist-$dev-$stamp"
       cp -p "$pkglist" "$pkglist-$dev-$stamp"
     fi
     mv "$filetoget" "$filetoget-$dev-$stamp"
-  else
-    echo -------- Files to get:
-    cat "$filetoget"
-    echo -------- end of Files to get:
-    rm "$filetoget"
   fi
   rm -f "$tPkgtochk_last" "$tFilelist" "$tFileorig"
   trap - 1 2 3 15 EXIT ERR
@@ -141,8 +141,8 @@ $listonlyp && log="log-getlist-$dev-$stamp"
     rm "$pkgondev"
   else
     mv "$pkgondev" "$pkgondev-$dev-$stamp"
-    "$dname"/make-list.sh ||
-      { echo "make-list.sh: failed.">&2; exit 32;}
-    #"$dname"/make-withname.sh
+    "$dname"/saa-make-list ||
+      { echo "saa-make-list: failed.">&2; exit 32;}
+    #"$dname"/saa-make-desc
   fi
 ) 2>&1 | tee "$log"

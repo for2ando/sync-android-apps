@@ -1,0 +1,58 @@
+#!/bin/bash
+pname=$(basename "$0")
+usage="$pname [{-s|--saadir} SaaDir] [-l|--listonly]
+$pname [-h|--help]"
+listonlyp=false
+while true; do
+  case "$1" in
+  -s|--saadir) SAADIR="$2"; shift 2;;
+  -l|--listonly) listonlyp=true; shift;;
+  -*) echo "$usage"; exit 1;;
+  *) break;;
+  esac
+done
+test $# -ne 0 && { echo "$usage"; exit 1;}
+
+dname=$(dirname "$0")
+case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+
+test -z "$SAADIR" && { echo "Please set envvar: SAADIR or use -s|--saadir option.">&2; exit 2;}
+appdir="$SAADIR"/apps
+appdir_escaped="$appdir"  # TODO: to be regexp escaped
+pkglist="$SAADIR"/@list
+#blacklist=@blacklist
+pkgondev=@pkgondev
+pkgtoput=@pkgtoput
+#filetoput=@filetoput
+test -d "$appdir" ||
+  { echo "$appdir: no such a (applications) directory.">&2; exit 3;}
+test -r "$pkglist" ||
+  { echo "$pkglist: no such a (packages list) file.">&2; exit 4;}
+
+adev="$(adb devices -l)"
+dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
+stamp=$(date +%Y%m%d-%H%M%S)
+log="log-put-$dev-$stamp"
+$listonlyp && log="log-putlist-$dev-$stamp"
+
+(
+  $quietp || echo "device: $dev">&2
+  $quietp || echo "timestamp: $stamp">&2
+  $quietp || echo "SAADIR=$SAADIR">&2
+
+  get-android-apps list -3 >"$pkgondev"
+  set-complement "$pkglist" "$pkgondev" >"$pkgtoput"
+
+  if $listonlyp; then
+    echo -------- Packages to put:
+    cat "$pkgtoput"
+    echo -------- end of Packages to put:
+    rm "$pkgtoput"
+  else
+    for obj in apk ab; do
+      put-android-apps $obj $(sed "s|^|$appdir_escaped|;s|$|.$obj|" "$pkgtoput")
+    done
+    mv "$pkgondev" "$pkgondev-$dev-$stamp"
+    mv "$pkgtoput" "$pkgtoput-$dev-$stamp"
+  fi
+) 2>&1 | tee "$log"

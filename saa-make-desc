@@ -1,0 +1,24 @@
+#!/bin/bash
+pname=$(basename "$0")
+usage="$pname [-h|--help]
+  -h|--help
+    This help message is displayed."
+while true; do
+  case "$1" in
+  -h|--help) echo "$usage"; exit 0;;
+  -*) echo "$usage"; exit 1;;
+  esac
+done
+test $# -ne 0 && { echo "$pname: extra arguments.">&2; echo "$usage"; exit 1;}
+
+pkglist=@list
+desclist=@description
+appsdir=apps
+
+(
+  test "$(basename $(pwd))" = "$appsdir" && cd ..
+  test -r "$pkglist" || { echo "$pkglist: no such a file here.">&2; exit 2;}
+  
+  cat "$pkglist" | get-android-app-name -p - >"$desclist" ||
+    { echo "$pname: abort.">&2; exit 3; }
+)

@@ -1,4 +1,4 @@
-# copy-appsdir.sh
+# saa-copy-saadir
 ## 要件
   2つの引数が必須。そして第1引数/appsディレクトリが存在する。  
 ## 動作
@@ -6,7 +6,7 @@
   第2引数ディレクトリに@listファイルを作成する(make-list.shを使う)。  
   第2引数ディレクトリに第1引数ディレクトリ下の@blacklistファイルをコピーする。  
 
-# get-supplement.sh
+# saa-get-apps
 ## 要件
   単一の端末とadb接続ができる。  
   appsディレクトリにいる or カレント直下にappsディレクトリがある。  
@@ -21,7 +21,7 @@
   新しい@listファイルを作る(make-list.shを使う)。  
   ログは log-get-デバイス名-タイムスタンプ に書かれる。  
 
-# put-supplement.sh
+# saa-put-apps
 ## 要件
   単一の端末とadb接続ができる。  
   環境変数APPDIRが設定されている。  
@@ -37,20 +37,16 @@
   新しい@listファイルを作る(make-list.shを使う)。  
   ログは ./log-put-デバイス名-タイムスタンプ に書かれる。  
 
-# add-black.sh
-これから作る。ブラックリストにアプリ名"$@"のアプリを追加する。
-→やっぱやめた。viによる編集とset-complementでできる。
-
 # get-update.sh
 これから作る。$APPDIR/appsのファイルを(最新だと想定される)端末のファイルで置き換える。
 
-# make-list.sh
+# saa-make-list
 ## 要件
   appsディレクトリにいる or カレント直下にappsディレクトリがある。  
 ## 動作
   apps下にapk又はabファイルのあるアプリのリストを、apps/../@listに作成。  
 
-# make-withname.sh
+# saa-make-desc
 ## 要件
   appsディレクトリにいる or カレント直下にappsディレクトリがある。  
 ## 動作

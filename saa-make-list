@@ -1,0 +1,27 @@
+#!/bin/bash
+pname=$(basename "$0")
+usage="$pname [-h|--help]
+  -h|--help
+    This help message is displayed."
+while true; do
+  case "$1" in
+  -h|--help) echo "$usage"; exit 0;;
+  -*) echo "$usage"; exit 1;;
+  *) break;;
+  esac
+done
+test $# -ne 0 && { echo "$pname: extra arguments.">&2; echo "$usage"; exit 1;}
+
+pkglist=@list
+appsdir=apps
+
+(
+  test "$(basename $(pwd))" = apps || {
+    test -d "$appsdir" || { echo "$appsdir: no such a directory here.">&2; exit 2;}
+    cd apps
+  }
+  
+  test -e ../"$pkglist" && rm -f ../"$pkglist"
+  ls *.{apk,ab} | sed 's|\.apk$||;s|\.ab$||' | sort | uniq >../"$pkglist" ||
+    { echo "$pname: abort.">&2; exit 3; }
+)
