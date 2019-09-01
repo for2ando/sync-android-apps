@@ -1,17 +1,26 @@
 #!/bin/bash
 pname=$(basename "$0")
-usage="$pname [-l|--listonly|-q|--quiet|-s|--silent]
+usage="$pname [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--nolog]
 $pname {-h|--help}"
-listonlyp=false
+targets='apk,ab'
+listp=false
 quietp=false
+verbosep=false
+dryrunp=false
+nologp=false
 while true; do
   case "$1" in
-  -l|--listonly) listonlyp=true; shift;;
-  -q|--quiet|-s|--silent) quietp=true; shift;;
+  -t|--target) targets="$2"; shift 2;;
+  -l|--list) listp=true; shift;;
+  -q|--quiet) quietp=true; shift;;
+  -v|--verbose) verbosep=true; shift;;
+  -n|--dryrun) dryrunp=true; verbosep=true; shift;;
+  --nolog) nologp=true; shift;;
   -*) echo "$usage"; exit 1;;
   *) break;;
   esac
 done
+targets=$(IFS=$' \t\n,'; echo $targets)
 test $# -ne 0 && { echo "$usage"; exit 1;}
 
 dname=$(dirname "$0")
@@ -20,8 +29,9 @@ case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 adev="$(adb devices -l)"
 dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
-log="log-get-$dev-$stamp"
-$listonlyp && log="log-getlist-$dev-$stamp"
+log="log-$dev-$stamp-get"
+$listp && log="log-$dev-$stamp-getlist"
+$nologp && log=/dev/null
 
 (
   $quietp || echo "device: $dev">&2
@@ -35,21 +45,22 @@ $listonlyp && log="log-getlist-$dev-$stamp"
   test "$(basename $(pwd))" = apps && cd ..
   test -r "$pkglist" -o -d apps || {
     echo "No $pkglist file nor apps directory here.
-      Please chdir to one of appdir which has '$pkglist' file and 'apps' dir.">&2
+      Please chdir to one of saadir which has '$pkglist' file and 'apps' dir.">&2
     exit 3
   }
+  ! $listp && ! $dryrunp && cp -p "$pkglist" "$pkglist-$stamp-pre_$dev"
 
-  $quietp || echo "**** compute supplements based on packages.">&2
+  $quietp || { echo; echo "**** compute supplements based on packages."; }>&2
   tPkgtoget_candidate=$(mktemp $pname.XXXXXXXX)
   trap "rm -f '$tPkgtoget_candidate'" 1 2 3 15 EXIT ERR
-  $quietp || echo "make $pkgondev: pkg-list on the device.">&2
+  $quietp || echo "make $pkgondev: pkgs-list on the device.">&2
   get-android-apps list -3 >"$pkgondev" ||
     { echo "get-android-apps -list: failed.">&2; rm -f "$pkgondev"; exit 5;}
-  $quietp || echo "make $pkgtoget: list of supplement pkgs.">&2
+  $quietp || echo "make $pkgtoget: list of pkgs to get (exist on the device but not saadir).">&2
   set-complement "$pkgondev" "$pkglist" >"$tPkgtoget_candidate" ||
     { echo "set-complement: failed.">&2;  exit 6;}
   if test -r "$blacklist"; then
-    $quietp || echo "apply $blacklist to $pkgtoget.">&2
+    $quietp || echo "apply blacklist $blacklist to $pkgtoget.">&2
     set-complement "$tPkgtoget_candidate" "$blacklist" >"$pkgtoget" ||
       { echo "set-complement: failed.">&2; rm -f "$pkgtoget"; exit 7;}
     rm -f "$tPkgtoget_candidate"
@@ -58,35 +69,40 @@ $listonlyp && log="log-getlist-$dev-$stamp"
   fi
   trap - 1 2 3 15 EXIT ERR
 
-  if $listonlyp; then
+  if $listp; then
     echo -------- Packages to get:
     cat "$pkgtoget"
     echo -------- end of Packages to get:
     rm "$pkgtoget"
   else
     if test $(cat "$pkgtoget" | wc -l) -eq 0; then
-      echo "No packages to get.">&2
+      $quietp || echo "No packages to get.">&2
     else
       cd apps
-      for obj in apk ab; do
+      for obj in $targets; do
         $quietp || echo "get $obj files of $pkgtoget pkgs.">&2
-        get-android-apps $obj $(cat ../"$pkgtoget")
+        set get-android-apps $obj $(cat ../"$pkgtoget")
+        $verbosep && echo "$@"
+        $dryrunp || "$@"
       done
       cd ..
-      cp -p "$pkglist" "$pkglist-pre-$dev-$stamp"
+      if $dryrunp; then
+        rm "$pkgtoget"
+      else
+        mv "$pkgtoget" "$pkgtoget-$stamp-$dev"
+      fi
     fi
-    mv "$pkgtoget" "$pkgtoget-$dev-$stamp"
   fi
 
-  $quietp || echo "**** compute supplements based on files.">&2
+  $quietp || { echo; echo "**** compute supplements based on files."; }>&2
   tPkgtochk_candidate=$(mktemp $pname.XXXXXXXX)
   tPkgtochk_last=$(mktemp $pname.XXXXXXXX)
   trap "rm -f '$tPkgtochk_candidate' '$tPkgtochk_last'" 1 2 3 15 EXIT ERR
-  $quietp || echo "make list of exist pkgs both on the device and the appdir.">&2
+  $quietp || echo "make list of exist pkgs both on the device and the saadir.">&2
   set-product "$pkgondev" "$pkglist" >"$tPkgtochk_candidate" ||
     { echo "set-product: failed.">&2;  exit 16;}
   if test -r "$blacklist"; then
-    $quietp || echo "apply $blacklist to the list.">&2
+    $quietp || echo "apply blacklist $blacklist to the list.">&2
     set-complement "$tPkgtochk_candidate" "$blacklist" >"$tPkgtochk_last" ||
       { echo "set-complement: failed.">&2; rm -f "$tPkgtochk_last"; exit 17;}
     rm -f "$tPkgtochk_candidate"
@@ -98,7 +114,7 @@ $listonlyp && log="log-getlist-$dev-$stamp"
   tFilelist=$(mktemp $pname.XXXXXXXX)
   tFileorig=$(mktemp $pname.XXXXXXXX)
   trap "rm -f '$tPkgtochk_last' '$tFilelist' '$tFileorig'" 1 2 3 15 EXIT ERR
-  $quietp || echo "make $tFilelist: file-list on the appdir.">&2
+  $quietp || echo "make $tFilelist: file-list on the saadir.">&2
   (cd apps; ls *.apk *.ab >../"$tFilelist")
   $quietp || echo "make $tFileorig: file-list on the device.">&2
   for pkg in $(cat "$tPkgtochk_last"); do
@@ -106,40 +122,46 @@ $listonlyp && log="log-getlist-$dev-$stamp"
       echo "$pkg.$obj">"$tFileorig"
     done
   done
-  $quietp || echo "make $filetoget: list of supplement files.">&2
+  $quietp || echo "make $filetoget: list of files to get (exist on the device but not saadir).">&2
   set-complement "$tFileorig" "$tFilelist" >"$filetoget" ||
     { echo "set-complement: failed.">&2;  exit 18;}
   
-  if $listonlyp; then
+  if $listp; then
     echo -------- Files to get:
     cat "$filetoget"
     echo -------- end of Files to get:
     rm "$filetoget"
   else
     if test $(cat "$filetoget" | wc -l) -eq 0; then
-      echo "No files to get.">&2
+      $quietp || echo "No files to get.">&2
     else
       cd apps
       tFiletoget=$(mktemp $pname.XXXXXXXX)
       trap "rm -f '$tFiletoget' '$tPkgtochk_last' '$tFilelist' '$tFileorig'" 1 2 3 15 EXIT ERR
-      for obj in apk ab; do
+      for obj in $targets; do
         $quietp || echo "get $obj files of $filetoget files.">&2
         fgrep ".$obj" ../"$filetoget" >"$tFiletoget"
         mapfile -t files <"$tFiletoget"
-        get-android-apps $obj "${files[@]}"
+        set get-android-apps $obj "${files[@]}"
+        $verbosep && echo "$@"
+        $dryrunp || "$@"
       done
       rm -f "$tFiletoget"
       cd ..
-      cp -p "$pkglist" "$pkglist-$dev-$stamp"
+      if $dryrunp; then
+        rm "$filetoget"
+      else
+        mv "$filetoget" "$filetoget-$stamp-$dev"
+      fi
     fi
-    mv "$filetoget" "$filetoget-$dev-$stamp"
   fi
   rm -f "$tPkgtochk_last" "$tFilelist" "$tFileorig"
   trap - 1 2 3 15 EXIT ERR
 
-  if $listonlyp; then
+  if $listp || $dryrunp; then
     rm "$pkgondev"
   else
+    cp -p "$pkglist" "$pkglist-$stamp-post_$dev"
     mv "$pkgondev" "$pkgondev-$dev-$stamp"
     "$dname"/saa-make-list ||
       { echo "saa-make-list: failed.">&2; exit 32;}

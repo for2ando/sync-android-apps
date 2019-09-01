@@ -1,9 +1,9 @@
 #!/bin/sh
 pname=$(basename "$0")
-usage="$pname  [-q|--quiet|-s|--silent|-v|--verbose|-n|--dryrun] SourceSAADir NewSAADir
+usage="$pname  [-q|--quiet|-v|--verbose|-n|--dryrun] SourceSAADir NewSAADir
 $pname  {-h|--help}
 Options:
-  -q|--quiet|-s|--silent
+  -q|--quiet
     No messages are displayed, except error message.
   -v|--verbose
     Additional messages are displayed. It has precedence over -q|--quiet|-s|--silent.
@@ -16,7 +16,7 @@ verbosep=false
 drurunp=false
 while true; do
   case "$1" in
-  -q|--quiet|-s|--silent) quietp=true; shift;;
+  -q|--quiet) quietp=true; shift;;
   -n|--dryrun) dryrunp=true; shift;;
   -v|--verbose) verbosep=true; shift;;
   -h|--help) echo "$usage"; exit 0;;
