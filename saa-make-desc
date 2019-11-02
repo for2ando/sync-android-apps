@@ -1,12 +1,18 @@
 #!/bin/bash
 pname=$(basename "$0")
 usage="$pname [-h|--help]
+Features:
+  Make a list (text file) of package names and labels of Android applications from '@list' file. 
+  The name of this list file is '@description'.
+Options:
   -h|--help
     This help message is displayed."
+
 while true; do
   case "$1" in
   -h|--help) echo "$usage"; exit 0;;
   -*) echo "$usage"; exit 1;;
+  *) break;;
   esac
 done
 test $# -ne 0 && { echo "$pname: extra arguments.">&2; echo "$usage"; exit 1;}

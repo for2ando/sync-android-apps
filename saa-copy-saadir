@@ -2,6 +2,8 @@
 pname=$(basename "$0")
 usage="$pname  [-q|--quiet|-v|--verbose|-n|--dryrun] SourceSAADir NewSAADir
 $pname  {-h|--help}
+Features:
+
 Options:
   -q|--quiet
     No messages are displayed, except error message.
@@ -11,6 +13,7 @@ Options:
     Only messages displayed, No SAADirectory is made.
   -h|--help
     This help message is displayed."
+
 quietp=false
 verbosep=false
 drurunp=false

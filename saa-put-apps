@@ -1,7 +1,13 @@
 #!/bin/bash
 pname=$(basename "$0")
 usage="$pname [{-s|--saadir} SaaDir] [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--nolog]
-$pname [-h|--help]"
+$pname [-h|--help]
+Features:
+
+Options:
+  -h|--help
+    This help message is displayed."
+
 targets='apk,ab'
 listp=false
 quietp=false
@@ -27,19 +33,6 @@ test $# -ne 0 && { echo "$usage"; exit 1;}
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 
-test -z "$SAADIR" && { echo "Please set envvar: SAADIR or use -s|--saadir option.">&2; exit 2;}
-saadir="$SAADIR"/apps
-saadir_escaped="$saadir"  # TODO: to be regexp escaped
-pkglist="$SAADIR"/@list
-#blacklist=@blacklist
-pkgondev=@pkgondev
-pkgtoput=@pkgtoput
-#filetoput=@filetoput
-test -d "$saadir" ||
-  { echo "$saadir: no such a (applications) directory.">&2; exit 3;}
-test -r "$pkglist" ||
-  { echo "$pkglist: no such a (packages list) file.">&2; exit 4;}
-
 adev="$(adb devices -l)"
 dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
@@ -51,9 +44,39 @@ $nologp && log=/dev/null
   $quietp || echo "device: $dev">&2
   $quietp || echo "timestamp: $stamp">&2
   $quietp || echo "SAADIR=$SAADIR">&2
+  pkglist=@list
+  blacklist=@blacklist
+  pkgondev=@pkgondev
+  pkgtoput=@pkgtoput
+  #filetoput=@filetoput
 
-  get-android-apps list -3 >"$pkgondev"
-  set-complement "$pkglist" "$pkgondev" >"$pkgtoput"
+  test -z "$SAADIR" && { echo "Please set envvar: SAADIR or use -s|--saadir option.">&2; exit 2;}
+  cd "$SAADIR"
+  appsdir=apps
+  appsdir_escaped="$appsdir"  # TODO: to be regexp escaped
+  test -d "$appsdir" ||
+    { echo "$appsdir: no such a (applications) directory.">&2; exit 3;}
+  test -r "$pkglist" ||
+    { echo "$pkglist: no such a (packages list) file.">&2; exit 4;}
+
+  $quietp || { echo; echo "**** compute supplements based on packages."; }>&2
+  tPkgtoput_candidate=$(mktemp $pname.XXXXXXXX)
+  trap "rm -f '$tPkgtoput_candidate'" 1 2 3 15 EXIT ERR
+  $quietp || echo "make $pkgondev: pkgs-list on the device.">&2
+  get-android-apps list -3 >"$pkgondev" ||
+    { echo "get-android-apps -list: failed.">&2; rm -f "$pkgondev"; exit 5;}
+  $quietp || echo "make $pkgtoput: list of pkgs to put (exist on the saadir but not on the device).">&2
+  set-complement "$pkglist" "$pkgondev" >"$tPkgtoput_candidate" ||
+    { echo "make $pkgtoput: failed.">&2;  exit 6;}
+  if test -r "$blacklist"; then
+    $quietp || echo "apply blacklist $blacklist to $pkgtoput.">&2
+    set-complement "$tPkgtoput_candidate" "$blacklist" >"$pkgtoput" ||
+      { echo "apply $blacklist: failed.">&2; rm -f "$pkgtoput"; exit 7;}
+    rm -f "$tPkgtoput_candidate"
+  else
+    mv "$tPkgtoput_candidate" "$pkgtoput"
+  fi
+  trap - 1 2 3 15 EXIT ERR
 
   if $listp; then
     echo -------- Packages to put:
@@ -61,12 +84,48 @@ $nologp && log=/dev/null
     echo -------- end of Packages to put:
     rm "$pkgtoput"
   else
-    for obj in $targets; do
-      set put-android-apps $obj $(sed "s|^|$saadir_escaped|;s|$|.$obj|" "$pkgtoput")
-      $verbosep && echo "$@"
-      $dryrunp || "$@"
-    done
+    if test $(cat "$pkgtoput" | wc -l) -eq 0; then
+      $quietp || echo "No packages to put.">&2
+    else
+      
+      for obj in $targets; do
+        $quietp || echo "put $obj files of $pkgtoput pkgs.">&2
+        case $obj in
+        apk)
+          unset files
+          for pkg in $(cat $pkgtoput); do
+            apks=$(ls "$appsdir"/$pkg.apk "$appsdir"/$pkg-*.apk 2>/dev/null)
+            if [ "$apks" = "" ]; then
+              echo "$pkg: no apk-files for the package.">&2
+            else
+              files="$files${files:+ }$apks"
+            fi
+          done
+          ;;
+        *)
+          files=$(sed "s|^|$appsdir_escaped/|;s|$|.$obj|" "$pkgtoput")
+          ;;
+        esac
+        set put-android-apps $obj $files
+        $verbosep && echo "$@"
+        $dryrunp || "$@"
+      done
+      
+      if $dryrunp; then
+        rm "$pkgtoput"
+      else
+        mv "$pkgtoput" "$pkgtoput-$stamp-$dev"
+      fi
+    fi
+  fi
+
+  if $listp || $dryrunp; then
+    rm "$pkgondev"
+  else
+    cp -p "$pkglist" "$pkglist-$stamp-post_$dev"
     mv "$pkgondev" "$pkgondev-$dev-$stamp"
-    mv "$pkgtoput" "$pkgtoput-$stamp-$dev"
+    "$dname"/saa-make-list ||
+      { echo "saa-make-list: failed.">&2; exit 32;}
+    #"$dname"/saa-make-desc
   fi
 ) 2>&1 | tee "$log"

@@ -1,7 +1,13 @@
 #!/bin/bash
 pname=$(basename "$0")
 usage="$pname [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--nolog]
-$pname {-h|--help}"
+$pname {-h|--help}
+Features:
+
+Options:
+  -h|--help
+    This help message is displayed."
+
 targets='apk,ab'
 listp=false
 quietp=false
@@ -58,11 +64,11 @@ $nologp && log=/dev/null
     { echo "get-android-apps -list: failed.">&2; rm -f "$pkgondev"; exit 5;}
   $quietp || echo "make $pkgtoget: list of pkgs to get (exist on the device but not saadir).">&2
   set-complement "$pkgondev" "$pkglist" >"$tPkgtoget_candidate" ||
-    { echo "set-complement: failed.">&2;  exit 6;}
+    { echo "make $pkgtoget: failed.">&2;  exit 6;}
   if test -r "$blacklist"; then
     $quietp || echo "apply blacklist $blacklist to $pkgtoget.">&2
     set-complement "$tPkgtoget_candidate" "$blacklist" >"$pkgtoget" ||
-      { echo "set-complement: failed.">&2; rm -f "$pkgtoget"; exit 7;}
+      { echo "apply $blacklist: failed.">&2; rm -f "$pkgtoget"; exit 7;}
     rm -f "$tPkgtoget_candidate"
   else
     mv "$tPkgtoget_candidate" "$pkgtoget"

@@ -1,8 +1,13 @@
 #!/bin/bash
 pname=$(basename "$0")
 usage="$pname [-h|--help]
+Features:
+  Make a list (text file) of package names of Android applications in the ./apps directory.
+  The name of this list file is '@list'.
+Options:
   -h|--help
     This help message is displayed."
+
 while true; do
   case "$1" in
   -h|--help) echo "$usage"; exit 0;;
@@ -22,6 +27,6 @@ appsdir=apps
   }
   
   test -e ../"$pkglist" && rm -f ../"$pkglist"
-  ls *.{apk,ab} | sed 's|\.apk$||;s|\.ab$||' | sort | uniq >../"$pkglist" ||
+  ls *.{apk,ab} | sed 's|-..*\.apk$||;s|\.apk||;;s|\.ab$||' | sort | uniq >../"$pkglist" ||
     { echo "$pname: abort.">&2; exit 3; }
 )
