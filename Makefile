@@ -7,4 +7,16 @@ install: $(INSTFILES)
 	install --target-directory=$(INSTDIR) $^
 
 diff: $(INSTFILES)
-	$(foreach i,$^,diff -u $(INSTDIR)/$i $i;)
+	$(foreach instfile,$^,diff -u $(INSTDIR)/$(instfile) $(instfile);)
+
+WORKDIR1=../copy-android-apps
+FILES_IN_WORKDIR1=run.sh
+
+.PHONY: prepare
+prepare: $(FILES_IN_WORKDIR1)
+
+$(FILES_IN_WORKDIR1): $(WORKDIR1)
+	ln -s $(addprefix $^/,$@) .
+
+$(WORKDIR1):
+	cd $(dir $@) && git clone git@github.com:for2ando/copy-android-apps.git $(notdir $@)

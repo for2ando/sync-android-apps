@@ -1,12 +1,34 @@
 #!/bin/bash
 pname=$(basename "$0")
-usage="$pname [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--nolog]
+dname=$(dirname "$0")
+usage="$pname [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--log|--nolog]
 $pname {-h|--help}
 Features:
+  Get (or list) programs (apk files) or data (adb backups or raw /data directory images) files
+  from a remote Android device using adb command.
+  The entity (the programs and the data) are stored to the 'apps' directory, which is a child of
+  current directory.
+  If a entity is already in the 'apps' directory, it does not get or list.
 
 Options:
+  -t|--target {apk|ab|apk,ab}
+    Target entities to get from a remote Android device. Default is apk,ab.
+  -l|--list
+    Instead of getting entities, List entities on a remote Android device.
+  -q|--quiet
+    No messages are displayed, except error message.
+  -v|--verbose
+    Additional messages are displayed. It has a precedence over -q|--quiet.
+  -n|--dryrun
+    Only messages displayed, No SAADirectory is made and no entities is got.
+  --log
+    Logging almost all messages to logfiles. It is a default.
+  --nolog
+    No log files created. It is a default when -n|--dryrun or -l|--list.
   -h|--help
     This help message is displayed."
+
+source "$dname/run.sh"
 
 targets='apk,ab'
 listp=false
@@ -17,10 +39,11 @@ nologp=false
 while true; do
   case "$1" in
   -t|--target) targets="$2"; shift 2;;
-  -l|--list) listp=true; shift;;
+  -l|--list) listp=true; nologp=true; shift;;
   -q|--quiet) quietp=true; shift;;
   -v|--verbose) verbosep=true; shift;;
-  -n|--dryrun) dryrunp=true; verbosep=true; shift;;
+  -n|--dryrun) dryrunp=true; verbosep=true; nologp=true; shift;;
+  --log) nologp=false; shift;;
   --nolog) nologp=true; shift;;
   -*) echo "$usage"; exit 1;;
   *) break;;
@@ -29,10 +52,9 @@ done
 targets=$(IFS=$' \t\n,'; echo $targets)
 test $# -ne 0 && { echo "$usage"; exit 1;}
 
-dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 
-adev="$(adb devices -l)"
+adev="$(_adb devices -l)"
 dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
 log="log-$dev-$stamp-get"
@@ -87,9 +109,7 @@ $nologp && log=/dev/null
       cd apps
       for obj in $targets; do
         $quietp || echo "get $obj files of $pkgtoget pkgs.">&2
-        set get-android-apps $obj $(cat ../"$pkgtoget")
-        $verbosep && echo "$@"
-        $dryrunp || "$@"
+        run get-android-apps $obj $(cat ../"$pkgtoget")
       done
       cd ..
       if $dryrunp; then
@@ -148,9 +168,7 @@ $nologp && log=/dev/null
         $quietp || echo "get $obj files of $filetoget files.">&2
         fgrep ".$obj" ../"$filetoget" >"$tFiletoget"
         mapfile -t files <"$tFiletoget"
-        set get-android-apps $obj "${files[@]}"
-        $verbosep && echo "$@"
-        $dryrunp || "$@"
+        run get-android-apps $obj "${files[@]}"
       done
       rm -f "$tFiletoget"
       cd ..
