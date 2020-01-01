@@ -1,0 +1,9 @@
+pkglist=@list
+blacklist=@blacklist
+desclist=@description
+pkgondev=@pkgondev
+pkgtoget=@pkgtoget
+filetoget=@filetoget
+pkgtoput=@pkgtoput
+filetoput=@filetoput
+appsdir=apps

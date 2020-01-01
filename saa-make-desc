@@ -8,6 +8,10 @@ Options:
   -h|--help
     This help message is displayed."
 
+source "$dname/saa-environ.sh"
+
+helpp=false
+opterrp=false
 declare -a opts
 while true; do
   case "$1" in
@@ -18,16 +22,14 @@ while true; do
   esac
   for opt in "${opts[@]}"; do
     case "$opt" in
-    -h|--help) echo "$usage"; exit 0;;
-    -*) echo "$usage"; exit 1;;
+    -h|--help) helpp=true;;
+    -*) echo "$opt: unknown option.">&2; opterrp=true;;
     esac
   done
 done
+$opterrp && exit 1
+$helpp || test $# -ne 0 && { echo "$usage"; exit;}
 test $# -ne 0 && { echo "$pname: extra arguments.">&2; echo "$usage"; exit 1;}
-
-pkglist=@list
-desclist=@description
-appsdir=apps
 
 (
   test "$(basename $(pwd))" = "$appsdir" && cd ..

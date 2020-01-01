@@ -1,7 +1,7 @@
 # Makefile for sync-android-apps
 
 INSTDIR=$(HOME)/bin
-INSTFILES=saa-make-list saa-make-desc saa-copy-saadir saa-get-apps saa-put-apps
+INSTFILES=saa-make-list saa-make-desc saa-copy-saadir saa-get-apps saa-put-apps saa-environ.sh
 
 install: $(INSTFILES)
 	install --target-directory=$(INSTDIR) $^

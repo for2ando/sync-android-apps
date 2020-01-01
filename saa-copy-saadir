@@ -15,9 +15,13 @@ Options:
   -h|--help
     This help message is displayed."
 
+source "$dname/saa-environ.sh"
+
 quietp=false
 verbosep=false
 drurunp=false
+helpp=false
+opterrp=false
 declare -a opts
 while true; do
   case "$1" in
@@ -31,12 +35,14 @@ while true; do
     -q|--quiet) quietp=true;;
     -n|--dryrun) dryrunp=true;;
     -v|--verbose) verbosep=true;;
-    -h|--help) echo "$usage"; exit 0;;
-    -*) echo "$usage"; exit 1;;
+    -h|--help) helpp=true;;
+    -*) echo "$opt: unknown option.">&2; opterrp=true;;
     esac
   done
 done
-test $# -ne 2 && { echo "$pname: missing arguments.">&2; echo "$usage"; exit 1;}
+$opterrp && exit 1
+$helpp || test $# -ne 0 && { echo "$usage"; exit;}
+test $# -ne 2 && { echo "$pname: missing arguments.">&2; exit 1;}
 $verbosep && {
   quietp=false
   lnopt=--verbose
@@ -46,8 +52,6 @@ case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 
 saadir="$1"
 newsaadir="$2"
-appsdir=apps
-pkgblacklist=@blacklist
 
 test -d "$saadir" ||
   { echo "$saadir: source directory not exist.">&2; exit 2;}
@@ -70,6 +74,6 @@ done
   #"$dname"/saa-make-desc ||
   #  { echo "$pname: abort.">&2; exit 6; }
 )
-$quietp || echo "copy $pkgblacklist.">&2
-cp "$saadir"/"$pkgblacklist" "$newsaadir"/ ||
+$quietp || echo "copy $blacklist.">&2
+cp "$saadir"/"$blacklist" "$newsaadir"/ ||
   { echo "$pname: abort.">&2; exit 7; }

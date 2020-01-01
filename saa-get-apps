@@ -30,6 +30,7 @@ Options:
 
 source "$dname/run.sh"
 source "$dname/adbwrappers.sh"
+source "$dname/saa-environ.sh"
 printcommandline() {
   echo -n $pname
   test -n "$SAADIR" && echo -n " --saadir '$SAADIR'"
@@ -88,11 +89,6 @@ $nologp && log=/dev/null
   $quietp || echo "commandline: $(printcommandline)">&2
   $quietp || echo "device: $dev">&2
   $quietp || echo "timestamp: $stamp">&2
-  pkglist=@list
-  blacklist=@blacklist
-  pkgondev=@pkgondev
-  pkgtoget=@pkgtoget
-  filetoget=@filetoget
   
   test "$(basename $(pwd))" = apps && cd ..
   test -r "$pkglist" -o -d apps || {

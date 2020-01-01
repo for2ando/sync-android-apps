@@ -32,6 +32,7 @@ Options:
 
 source "$dname/run.sh"
 source "$dname/adbwrappers.sh"
+source "$dname/saa-environ.sh"
 printcommandline() {
   echo -n $pname
   test -n "$SAADIR" && echo -n " --saadir '$SAADIR'"
@@ -92,11 +93,6 @@ $nologp && log=/dev/null
   $quietp || echo "device: $dev">&2
   $quietp || echo "timestamp: $stamp">&2
   $quietp || echo "SAADIR=$SAADIR">&2
-  pkglist=@list
-  blacklist=@blacklist
-  pkgondev=@pkgondev
-  pkgtoput=@pkgtoput
-  #filetoput=@filetoput
 
   test -z "$SAADIR" && { echo "Please set envvar: SAADIR or use -s|--saadir option.">&2; exit 2;}
   cd "$SAADIR"
