@@ -8,7 +8,7 @@ Features:
   to a remote Android device using adb command.
   Putting entity (programs and data) have to be stored to the 'apps' directory, which is a child
   of SaaDir directory specified by -s|--saadir.
-  If a entity is already in a remote Android device, no entity is put or list.
+  If a entity is already in a remote Android device, it does not put or list.
 
 Options:
   -s|--saadir SaaDir
@@ -38,19 +38,27 @@ quietp=false
 verbosep=false
 dryrunp=false
 nologp=false
+declare -a opts
 while true; do
   case "$1" in
-  -s|--saadir) SAADIR="$2"; shift 2;;
-  -t|--target) targets="$2"; shift 2;;
-  -l|--list) listp=true; shift;;
-  -q|--quiet) quietp=true; shift;;
-  -v|--verbose) verbosep=true; shift;;
-  -n|--dryrun) dryrunp=true; verbosep=true; nologp=true; shift;;
-  --log) nologp=false; shift;;
-  --nolog) nologp=true; shift;;
-  -*) echo "$usage"; exit 1;;
+  -|--) break;;
+  --*) opts=("$1"); shift;;
+  -*) for n in $(seq 1 $((${#1}-1))); do opts[$n]="-${1:$n:1}"; done; shift;;
   *) break;;
   esac
+  for opt in "${opts[@]}"; do
+    case "$opt" in
+    -s|--saadir) SAADIR="$1";;
+    -t|--target) targets="$1";;
+    -l|--list) listp=true;;
+    -q|--quiet) quietp=true;;
+    -v|--verbose) verbosep=true;;
+    -n|--dryrun) dryrunp=true; verbosep=true; nologp=true;;
+    --log) nologp=false;;
+    --nolog) nologp=true;;
+    -*) echo "$usage"; exit 1;;
+    esac
+  done
 done
 targets=$(IFS=$' \t\n,'; echo $targets)
 test $# -ne 0 && { echo "$usage"; exit 1;}

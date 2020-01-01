@@ -8,12 +8,21 @@ Options:
   -h|--help
     This help message is displayed."
 
+declare -a opts
 while true; do
   case "$1" in
-  -h|--help) echo "$usage"; exit 0;;
-  -*) echo "$usage"; exit 1;;
+  -|--) break;;
+  --*) opts=("$1"); shift;;
+  -*) for n in $(seq 1 $((${#1}-1))); do opts[$n]="-${1:$n:1}"; done; shift;;
   *) break;;
   esac
+  for opt in "${opts[@]}"; do
+    case "$opt" in
+    -h|--help) echo "$usage"; exit 0;;
+    -*) echo "$usage"; exit 1;;
+    *) break;;
+    esac
+  done
 done
 test $# -ne 0 && { echo "$pname: extra arguments.">&2; echo "$usage"; exit 1;}
 

@@ -18,15 +18,23 @@ Options:
 quietp=false
 verbosep=false
 drurunp=false
+declare -a opts
 while true; do
   case "$1" in
-  -q|--quiet) quietp=true; shift;;
-  -n|--dryrun) dryrunp=true; shift;;
-  -v|--verbose) verbosep=true; shift;;
-  -h|--help) echo "$usage"; exit 0;;
-  -*) echo "$usage"; exit 1;;
+  -|--) break;;
+  --*) opts=("$1"); shift;;
+  -*) for n in $(seq 1 $((${#1}-1))); do opts[$n]="-${1:$n:1}"; done; shift;;
   *) break;;
   esac
+  for opt in "${opts[@]}"; do
+    case "$opt" in
+    -q|--quiet) quietp=true;;
+    -n|--dryrun) dryrunp=true;;
+    -v|--verbose) verbosep=true;;
+    -h|--help) echo "$usage"; exit 0;;
+    -*) echo "$usage"; exit 1;;
+    esac
+  done
 done
 test $# -ne 2 && { echo "$pname: missing arguments.">&2; echo "$usage"; exit 1;}
 $verbosep && {
