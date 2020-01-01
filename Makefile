@@ -10,13 +10,13 @@ diff: $(INSTFILES)
 	$(foreach instfile,$^,diff -u $(INSTDIR)/$(instfile) $(instfile);)
 
 WORKDIR1=../copy-android-apps
-FILES_IN_WORKDIR1=run.sh
+FILES_IN_WORKDIR1=run.sh adbwrappers.sh
 
 .PHONY: prepare
 prepare: $(FILES_IN_WORKDIR1)
 
 $(FILES_IN_WORKDIR1): $(WORKDIR1)
-	ln -s $(addprefix $^/,$@) .
+	ln -sf $(addprefix $^/,$@) .
 
 $(WORKDIR1):
 	cd $(dir $@) && git clone git@github.com:for2ando/copy-android-apps.git $(notdir $@)

@@ -31,6 +31,17 @@ Options:
     This help message is displayed."
 
 source "$dname/run.sh"
+source "$dname/adbwrappers.sh"
+printcommandline() {
+  echo -n $pname
+  test -n "$SAADIR" && echo -n " --saadir '$SAADIR'"
+  echo -n " --target '$targets'"
+  $listp && echo -n " --list"
+  $quietp && echo -n " --quiet"
+  $verbosep && echo -n " --verbose"
+  $dryrunp && echo -n " --dryrun"
+  $nologp && echo -n " --nolog" || echo -n " --log"
+}
 
 targets='apk,ab'
 listp=false
@@ -38,6 +49,8 @@ quietp=false
 verbosep=false
 dryrunp=false
 nologp=false
+helpp=false
+opterrp=false
 declare -a opts
 while true; do
   case "$1" in
@@ -56,12 +69,14 @@ while true; do
     -n|--dryrun) dryrunp=true; verbosep=true; nologp=true;;
     --log) nologp=false;;
     --nolog) nologp=true;;
-    -*) echo "$usage"; exit 1;;
+    -h|--help) helpp=true;;
+    -*) echo "$opt: unknown option.">&2; opterrp=true;;
     esac
   done
 done
+$opterrp && exit 1
+$helpp || test $# -ne 0 && { echo "$usage"; exit;}
 targets=$(IFS=$' \t\n,'; echo $targets)
-test $# -ne 0 && { echo "$usage"; exit 1;}
 
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 
@@ -73,6 +88,7 @@ $listp && log="log-$dev-$stamp-putlist"
 $nologp && log=/dev/null
 
 (
+  $quietp || echo "commandline: $(printcommandline)">&2
   $quietp || echo "device: $dev">&2
   $quietp || echo "timestamp: $stamp">&2
   $quietp || echo "SAADIR=$SAADIR">&2
