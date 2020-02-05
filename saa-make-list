@@ -1,5 +1,7 @@
 #!/bin/bash
 pname=$(basename "$0")
+dname=$(dirname "$0")
+case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 usage="$pname [-h|--help]
 Features:
   Make a list (text file) of package names of Android applications in the ./apps directory.

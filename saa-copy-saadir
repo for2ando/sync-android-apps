@@ -1,6 +1,7 @@
 #!/bin/sh
 pname=$(basename "$0")
 dname=$(dirname "$0")
+case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 usage="$pname  [-q|--quiet|-v|--verbose|-n|--dryrun] SourceSAADir NewSAADir
 $pname  {-h|--help}
 Features:
@@ -48,7 +49,6 @@ $verbosep && {
   lnopt=--verbose
 }
 
-case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 
 saadir="$1"
 newsaadir="$2"

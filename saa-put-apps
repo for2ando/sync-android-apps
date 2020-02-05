@@ -1,8 +1,9 @@
 #!/bin/bash
 pname=$(basename "$0")
 dname=$(dirname "$0")
+case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 usage="$pname [{-s|--saadir} SaaDir] [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--log|--nolog]
-$pname [-h|--help]
+$pname {-h|--help}
 Features:
   Put (or list) programs (apk files) or data (adb backups or raw /data directory images) files
   to a remote Android device using adb command.
@@ -32,6 +33,7 @@ Options:
 
 source "$dname/run.sh"
 source "$dname/adbwrappers.sh"
+source "$dname/trapwrapper.sh"
 source "$dname/saa-environ.sh"
 printcommandline() {
   echo -n $pname
@@ -62,8 +64,8 @@ while true; do
   esac
   for opt in "${opts[@]}"; do
     case "$opt" in
-    -s|--saadir) SAADIR="$1";;
-    -t|--target) targets="$1";;
+    -s|--saadir) SAADIR="$1"; shift;;
+    -t|--target) targets="$1"; shift;;
     -l|--list) listp=true;;
     -q|--quiet) quietp=true;;
     -v|--verbose) verbosep=true;;
@@ -79,14 +81,29 @@ $opterrp && exit 1
 $helpp || test $# -ne 0 && { echo "$usage"; exit;}
 targets=$(IFS=$' \t\n,'; echo $targets)
 
-case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+#signals='EXIT SIGHUP SIGINT SIGQUIT SIGTERM ERR'
+signals='SIGHUP SIGINT SIGQUIT SIGTERM'
+workdir=$(mktemp --tmpdir --directory $pname.d.XXXXXXXXXX)
+trap-open rmtmp $signals
+trap-addcmd rmtmp "$nologp || copyworktolog; rm -rf '$workdir'"
+trap-calltrap rmtmp
 
 adev="$(adb devices -l)"
 dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
-log="log-$dev-$stamp-put"
-$listp && log="log-$dev-$stamp-putlist"
-$nologp && log=/dev/null
+if $listp; then
+  logdir="log.d-$dev-$stamp-putlist"
+else
+  logdir="log.d-$dev-$stamp-put"
+fi
+if $nologp; then
+  log=/dev/null
+else
+  log="$workdir/$logfilename"
+fi
+pkgondev="$workdir/$pkgondev_stem"
+pkgtoput="$workdir/$pkgtoput_stem"
+#filetoput="$workdir/$filetoput_stem"
 
 (
   $quietp || echo "commandline: $(printcommandline)">&2
@@ -104,23 +121,25 @@ $nologp && log=/dev/null
     { echo "$pkglist: no such a (packages list) file.">&2; exit 4;}
 
   $quietp || { echo; echo "**** compute supplements based on packages."; }>&2
-  tPkgtoput_candidate=$(mktemp $pname.XXXXXXXX)
-  trap "rm -f '$tPkgtoput_candidate'" 1 2 3 15 EXIT ERR
-  $quietp || echo "make $pkgondev: pkgs-list on the device.">&2
+  tPkgtoput_candidate="$workdir"/tPkgtoput_candidate
+  trap-addcmd rmtmp "rm -f '$tPkgtoput_candidate'"
+  trap-calltrap rmtmp
+  $quietp || echo "make $pkgondev_stem: pkgs-list on the device.">&2
   get-android-apps list -3 >"$pkgondev" ||
     { echo "get-android-apps -list: failed.">&2; rm -f "$pkgondev"; exit 5;}
-  $quietp || echo "make $pkgtoput: list of pkgs to put (exist on the saadir but not on the device).">&2
+  $quietp || echo "make $pkgtoput_stem: list of pkgs to put (exist on the saadir but not on the device).">&2
   set-complement "$pkglist" "$pkgondev" >"$tPkgtoput_candidate" ||
     { echo "make $pkgtoput: failed.">&2;  exit 6;}
   if test -r "$blacklist"; then
-    $quietp || echo "apply blacklist $blacklist to $pkgtoput.">&2
+    $quietp || echo "apply blacklist $blacklist to $pkgtoput_stem.">&2
     set-complement "$tPkgtoput_candidate" "$blacklist" >"$pkgtoput" ||
       { echo "apply $blacklist: failed.">&2; rm -f "$pkgtoput"; exit 7;}
     rm -f "$tPkgtoput_candidate"
   else
     mv "$tPkgtoput_candidate" "$pkgtoput"
   fi
-  trap - 1 2 3 15 EXIT ERR
+  trap-removecmd rmtmp "rm -f '$tPkgtoput_candidate'"
+  trap-calltrap rmtmp
 
   if $listp; then
     echo -------- Packages to put:
@@ -133,7 +152,7 @@ $nologp && log=/dev/null
     else
       
       for obj in $targets; do
-        $quietp || echo "put $obj files of $pkgtoput pkgs.">&2
+        $quietp || echo "put $obj files of $pkgtoput_stem pkgs.">&2
         case $obj in
         apk)
           unset files
@@ -147,27 +166,29 @@ $nologp && log=/dev/null
           done
           ;;
         *)
+          #echo "workdir=[$workdir]"
+          #ls -d "$workdir"
           files=$(sed "s|^|$appsdir_escaped/|;s|$|.$obj|" "$pkgtoput")
           ;;
         esac
         run put-android-apps $obj $files
       done
       
-      if $dryrunp; then
-        rm "$pkgtoput"
-      else
-        mv "$pkgtoput" "$pkgtoput-$stamp-$dev"
-      fi
+      $dryrunp && rm "$pkgtoput"
     fi
   fi
 
   if $listp || $dryrunp; then
     rm "$pkgondev"
   else
-    cp -p "$pkglist" "$pkglist-$stamp-post_$dev"
-    mv "$pkgondev" "$pkgondev-$dev-$stamp"
+    cp -p "$pkglist" "$workdir/$pkglist-post"
+    cp -p "$blacklist" "$workdir/$blacklist"
     "$dname"/saa-make-list ||
       { echo "saa-make-list: failed.">&2; exit 32;}
     #"$dname"/saa-make-desc
   fi
 ) 2>&1 | tee "$log"
+
+$nologp || copyworktolog
+rm -rf "$workdir"
+trap-close rmtmp

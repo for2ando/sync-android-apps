@@ -1,6 +1,7 @@
 #!/bin/bash
 pname=$(basename "$0")
 dname=$(dirname "$0")
+case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 usage="$pname [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--log|--nolog]
 $pname {-h|--help}
 Features:
@@ -30,6 +31,7 @@ Options:
 
 source "$dname/run.sh"
 source "$dname/adbwrappers.sh"
+source "$dname/trapwrapper.sh"
 source "$dname/saa-environ.sh"
 printcommandline() {
   echo -n $pname
@@ -60,7 +62,7 @@ while true; do
   esac
   for opt in "${opts[@]}"; do
     case "$opt" in
-    -t|--target) targets="$1";;
+    -t|--target) targets="$1"; shift;;
     -l|--list) listp=true; nologp=true;;
     -q|--quiet) quietp=true;;
     -v|--verbose) verbosep=true;;
@@ -76,14 +78,32 @@ $opterrp && exit 1
 $helpp || test $# -ne 0 && { echo "$usage"; exit;}
 targets=$(IFS=$' \t\n,'; echo $targets)
 
-case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+#signals='EXIT SIGHUP SIGINT SIGQUIT SIGTERM ERR'
+signals='SIGHUP SIGINT SIGQUIT SIGTERM'
+workdir=$(mktemp --tmpdir --directory $pname.d.XXXXXXXXXX)
+trap-open rmtmp $signals
+trap-addcmd rmtmp "rm -rf '$workdir'"
+trap-calltrap rmtmp
 
 adev="$(_adb devices -l)"
 dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
-log="log-$dev-$stamp-get"
-$listp && log="log-$dev-$stamp-getlist"
-$nologp && log=/dev/null
+if $listp; then
+  logdir="log.d-$dev-$stamp-getlist"
+else
+  logdir="log.d-$dev-$stamp-get"
+fi
+trap-removecmd rmtmp "rm -rf '$workdir'"
+trap-addcmd rmtmp "$nologp || copyworktolog; rm -rf '$workdir'"
+trap-calltrap rmtmp
+if $nologp; then
+  log=/dev/null
+else
+  log="$workdir/$logfilename"
+fi
+pkgondev="$workdir/$pkgondev_stem"
+pkgtoget="$workdir/$pkgtoget_stem"
+filetoget="$workdir/$filetoget_stem"
 
 (
   $quietp || echo "commandline: $(printcommandline)">&2
@@ -96,26 +116,28 @@ $nologp && log=/dev/null
       Please chdir to one of saadir which has '$pkglist' file and 'apps' dir.">&2
     exit 3
   }
-  ! $listp && ! $dryrunp && cp -p "$pkglist" "$pkglist-$stamp-pre_$dev"
+  ! $listp && ! $dryrunp && cp -p "$pkglist" "$workdir/$pkglist-pre"
 
   $quietp || { echo; echo "**** compute supplements based on packages."; }>&2
-  tPkgtoget_candidate=$(mktemp $pname.XXXXXXXX)
-  trap "rm -f '$tPkgtoget_candidate'" 1 2 3 15 EXIT ERR
-  $quietp || echo "make $pkgondev: pkgs-list on the device.">&2
+  tPkgtoget_candidate="$workdir"/tPkgtoget_candidate
+  trap-addcmd rmtmp "rm -f '$tPkgtoget_candidate'"
+  trap-calltrap rmtmp
+  $quietp || echo "make $pkgondev_stem: pkgs-list on the device.">&2
   get-android-apps list -3 >"$pkgondev" ||
     { echo "get-android-apps -list: failed.">&2; rm -f "$pkgondev"; exit 5;}
-  $quietp || echo "make $pkgtoget: list of pkgs to get (exist on the device but not saadir).">&2
+  $quietp || echo "make $pkgtoget_stem: list of pkgs to get (exist on the device but not saadir).">&2
   set-complement "$pkgondev" "$pkglist" >"$tPkgtoget_candidate" ||
     { echo "make $pkgtoget: failed.">&2;  exit 6;}
   if test -r "$blacklist"; then
-    $quietp || echo "apply blacklist $blacklist to $pkgtoget.">&2
+    $quietp || echo "apply blacklist $blacklist to $pkgtoget_stem.">&2
     set-complement "$tPkgtoget_candidate" "$blacklist" >"$pkgtoget" ||
       { echo "apply $blacklist: failed.">&2; rm -f "$pkgtoget"; exit 7;}
     rm -f "$tPkgtoget_candidate"
   else
     mv "$tPkgtoget_candidate" "$pkgtoget"
   fi
-  trap - 1 2 3 15 EXIT ERR
+  trap-removecmd rmtmp "rm -f '$tPkgtoget_candidate'"
+  trap-calltrap rmtmp
 
   if $listp; then
     echo -------- Packages to get:
@@ -128,22 +150,20 @@ $nologp && log=/dev/null
     else
       cd apps
       for obj in $targets; do
-        $quietp || echo "get $obj files of $pkgtoget pkgs.">&2
-        run get-android-apps $obj $(cat ../"$pkgtoget")
+        $quietp || echo "get $obj files of $pkgtoget_stem pkgs.">&2
+        run get-android-apps $obj $(cat "$pkgtoget")
       done
       cd ..
-      if $dryrunp; then
-        rm "$pkgtoget"
-      else
-        mv "$pkgtoget" "$pkgtoget-$stamp-$dev"
-      fi
     fi
+    $dryrunp && rm "$pkgtoget"
   fi
 
   $quietp || { echo; echo "**** compute supplements based on files."; }>&2
-  tPkgtochk_candidate=$(mktemp $pname.XXXXXXXX)
-  tPkgtochk_last=$(mktemp $pname.XXXXXXXX)
-  trap "rm -f '$tPkgtochk_candidate' '$tPkgtochk_last'" 1 2 3 15 EXIT ERR
+  tPkgtochk_candidate="$workdir"/tPkgtochk_candidate
+  tPkgtochk_last="$workdir"/tPkgtochk_last
+  trap-addcmd rmtmp "rm -f '$tPkgtochk_last'"
+  trap-addcmd rmtmp "rm -f '$tPkgtochk_candidate'"
+  trap-calltrap rmtmp
   $quietp || echo "make list of exist pkgs both on the device and the saadir.">&2
   set-product "$pkgondev" "$pkglist" >"$tPkgtochk_candidate" ||
     { echo "set-product: failed.">&2;  exit 16;}
@@ -155,20 +175,23 @@ $nologp && log=/dev/null
   else
     mv "$tPkgtochk_candidate" "$tPkgtochk_last"
   fi
-  trap "'$tPkgtochk_last'" 1 2 3 15 EXIT ERR
+  trap-removecmd rmtmp "rm -f '$tPkgtochk_candidate'"
+  trap-calltrap rmtmp
   
-  tFilelist=$(mktemp $pname.XXXXXXXX)
-  tFileorig=$(mktemp $pname.XXXXXXXX)
-  trap "rm -f '$tPkgtochk_last' '$tFilelist' '$tFileorig'" 1 2 3 15 EXIT ERR
+  tFilelist="$workdir"/tFilelist
+  tFileorig="$workdir"/tFileorig
+  trap-addcmd rmtmp "rm -f '$tFilelist'"
+  trap-addcmd rmtmp "rm -f '$tFileorig'"
+  trap-calltrap rmtmp
   $quietp || echo "make $tFilelist: file-list on the saadir.">&2
-  (cd apps; ls *.apk *.ab >../"$tFilelist")
+  (cd apps; ls *.apk *.ab >"$tFilelist")
   $quietp || echo "make $tFileorig: file-list on the device.">&2
   for pkg in $(cat "$tPkgtochk_last"); do
     for obj in apk ab; do
       echo "$pkg.$obj">"$tFileorig"
     done
   done
-  $quietp || echo "make $filetoget: list of files to get (exist on the device but not saadir).">&2
+  $quietp || echo "make $filetoget_stem: list of files to get (exist on the device but not saadir).">&2
   set-complement "$tFileorig" "$tFilelist" >"$filetoget" ||
     { echo "set-complement: failed.">&2;  exit 18;}
   
@@ -182,33 +205,38 @@ $nologp && log=/dev/null
       $quietp || echo "No files to get.">&2
     else
       cd apps
-      tFiletoget=$(mktemp $pname.XXXXXXXX)
-      trap "rm -f '$tFiletoget' '$tPkgtochk_last' '$tFilelist' '$tFileorig'" 1 2 3 15 EXIT ERR
+      tFiletoget="$workdir"/tFiletoget
+      trap-addcmd rmtmp "rm -f '$tFiletoget'"
+      trap-calltrap rmtmp
       for obj in $targets; do
-        $quietp || echo "get $obj files of $filetoget files.">&2
-        fgrep ".$obj" ../"$filetoget" >"$tFiletoget"
+        $quietp || echo "get $obj files of $filetoget_stem files.">&2
+        fgrep ".$obj" "$filetoget" >"$tFiletoget"
         mapfile -t files <"$tFiletoget"
         run get-android-apps $obj "${files[@]}"
       done
       rm -f "$tFiletoget"
+      trap-removecmd rmtmp "rm -f '$tFiletoget'"
+      trap-calltrap rmtmp
       cd ..
-      if $dryrunp; then
-        rm "$filetoget"
-      else
-        mv "$filetoget" "$filetoget-$stamp-$dev"
-      fi
     fi
+    $dryrunp && rm "$filetoget"
   fi
   rm -f "$tPkgtochk_last" "$tFilelist" "$tFileorig"
-  trap - 1 2 3 15 EXIT ERR
+  
+  trap-removecmd rmtmp "rm -f '$tFileorig'"
+  trap-removecmd rmtmp "rm -f '$tFilelist'"
+  trap-removecmd rmtmp "rm -f '$tPkgtochk_last'"
+  trap-calltrap rmtmp
 
   if $listp || $dryrunp; then
     rm "$pkgondev"
   else
-    cp -p "$pkglist" "$pkglist-$stamp-post_$dev"
-    mv "$pkgondev" "$pkgondev-$dev-$stamp"
-    "$dname"/saa-make-list ||
-      { echo "saa-make-list: failed.">&2; exit 32;}
-    #"$dname"/saa-make-desc
+    cp -p "$pkglist" "$workdir/$pkglist-post"
+    cp -p "$blacklist" "$workdir/$blacklist"
+    "$dname"/saa-make-list || { echo "saa-make-list: failed.">&2; exit 32;}
   fi
 ) 2>&1 | tee "$log"
+
+$nologp || copyworktolog
+rm -rf "$workdir"
+trap-close rmtmp

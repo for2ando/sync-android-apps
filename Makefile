@@ -1,4 +1,5 @@
 # Makefile for sync-android-apps
+.PHONY: install diff prepare
 
 INSTDIR=$(HOME)/bin
 INSTFILES=saa-make-list saa-make-desc saa-copy-saadir saa-get-apps saa-put-apps saa-environ.sh
@@ -9,14 +10,21 @@ install: $(INSTFILES)
 diff: $(INSTFILES)
 	$(foreach instfile,$^,diff -u $(INSTDIR)/$(instfile) $(instfile);)
 
-WORKDIR1=../copy-android-apps
-FILES_IN_WORKDIR1=run.sh adbwrappers.sh
+IMPORTDIR1=../copy-android-apps
+IMPORTFILES1=run.sh adbwrappers.sh
+IMPORTDIR2=../trapwrapper
+IMPORTFILES2=trapwrapper.sh
 
-.PHONY: prepare
-prepare: $(FILES_IN_WORKDIR1)
+prepare: $(IMPORTFILES1) $(IMPORTFILES2)
 
-$(FILES_IN_WORKDIR1): $(WORKDIR1)
+$(IMPORTFILES1): $(IMPORTDIR1)
 	ln -sf $(addprefix $^/,$@) .
 
-$(WORKDIR1):
+$(IMPORTFILES2): $(IMPORTDIR2)
+	ln -sf $(addprefix $^/,$@) .
+
+$(IMPORTDIR1):
 	cd $(dir $@) && git clone git@github.com:for2ando/copy-android-apps.git $(notdir $@)
+
+$(IMPORTDIR2):
+	cd $(dir $@) && git clone git@github.com:for2ando/trapwrapper.git $(notdir $@)
