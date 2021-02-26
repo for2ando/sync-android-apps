@@ -3,6 +3,10 @@
 
 INSTDIR=$(HOME)/bin
 INSTFILES=saa-make-list saa-make-desc saa-copy-saadir saa-get-apps saa-put-apps saa-environ.sh
+IMPORTDIR1=../copy-android-apps
+IMPORTFILES1=run.sh adbwrappers.sh
+IMPORTDIR2=../trapwrapper
+IMPORTFILES2=trapwrapper.sh
 
 install: $(INSTFILES)
 	install --target-directory=$(INSTDIR) $^
@@ -10,12 +14,10 @@ install: $(INSTFILES)
 diff: $(INSTFILES)
 	$(foreach instfile,$^,diff -u $(INSTDIR)/$(instfile) $(instfile);)
 
-IMPORTDIR1=../copy-android-apps
-IMPORTFILES1=run.sh adbwrappers.sh
-IMPORTDIR2=../trapwrapper
-IMPORTFILES2=trapwrapper.sh
-
 prepare: $(IMPORTFILES1) $(IMPORTFILES2)
+
+clean:
+	rm -f $(IMPORTFILES1) $(IMPORTFILES2)
 
 $(IMPORTFILES1): $(IMPORTDIR1)
 	ln -sf $(addprefix $^/,$@) .
