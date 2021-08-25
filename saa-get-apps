@@ -188,7 +188,7 @@ filetoget="$workdir/$filetoget_stem"
   $quietp || echo "make $tFileorig: file-list on the device.">&2
   for pkg in $(cat "$tPkgtochk_last"); do
     for obj in apk ab; do
-      echo "$pkg.$obj">"$tFileorig"
+      echo "$pkg.$obj">>"$tFileorig"
     done
   done
   $quietp || echo "make $filetoget_stem: list of files to get (exist on the device but not saadir).">&2
@@ -232,7 +232,7 @@ filetoget="$workdir/$filetoget_stem"
     rm "$pkgondev"
   else
     cp -p "$pkglist" "$workdir/$pkglist-post"
-    cp -p "$blacklist" "$workdir/$blacklist"
+    test -r "$blacklist" && cp -p "$blacklist" "$workdir/$blacklist"
     "$dname"/saa-make-list || { echo "saa-make-list: failed.">&2; exit 32;}
   fi
 ) 2>&1 | tee "$log"
