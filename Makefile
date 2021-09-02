@@ -4,7 +4,7 @@
 INSTDIR=$(HOME)/bin
 INSTFILES=saa-make-list saa-make-desc saa-copy-saadir saa-get-apps saa-put-apps saa-environ.sh
 IMPORTDIR1=../copy-android-apps
-IMPORTFILES1=run.sh adbwrappers.sh
+IMPORTFILES1=run.sh adbwrappers.sh in_args.sh
 IMPORTDIR2=../trapwrapper
 IMPORTFILES2=trapwrapper.sh
 

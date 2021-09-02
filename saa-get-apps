@@ -31,6 +31,7 @@ Options:
 
 source "$dname/run.sh"
 source "$dname/adbwrappers.sh"
+source "$dname/in_args.sh"
 source "$dname/trapwrapper.sh"
 source "$dname/saa-environ.sh"
 printcommandline() {
@@ -105,6 +106,7 @@ pkgondev="$workdir/$pkgondev_stem"
 pkgtoget="$workdir/$pkgtoget_stem"
 filetoget="$workdir/$filetoget_stem"
 
+
 (
   $quietp || echo "commandline: $(printcommandline)">&2
   $quietp || echo "device: $dev">&2
@@ -117,6 +119,8 @@ filetoget="$workdir/$filetoget_stem"
     exit 3
   }
   ! $listp && ! $dryrunp && cp -p "$pkglist" "$workdir/$pkglist-pre"
+
+
 
   $quietp || { echo; echo "**** compute supplements based on packages."; }>&2
   tPkgtoget_candidate="$workdir"/tPkgtoget_candidate
@@ -158,6 +162,9 @@ filetoget="$workdir/$filetoget_stem"
     $dryrunp && rm "$pkgtoget"
   fi
 
+
+
+  in_args apk $targets && {
   $quietp || { echo; echo "**** compute supplements based on files."; }>&2
   tPkgtochk_candidate="$workdir"/tPkgtochk_candidate
   tPkgtochk_last="$workdir"/tPkgtochk_last
@@ -184,13 +191,11 @@ filetoget="$workdir/$filetoget_stem"
   trap-addcmd rmtmp "rm -f '$tFileorig'"
   trap-calltrap rmtmp
   $quietp || echo "make $tFilelist: file-list on the saadir.">&2
-  (cd apps; ls *.apk *.ab >"$tFilelist")
+  (cd apps; ls *.apk 2>/dev/null) >"$tFilelist"
   $quietp || echo "make $tFileorig: file-list on the device.">&2
   for pkg in $(cat "$tPkgtochk_last"); do
-    for obj in apk ab; do
-      echo "$pkg.$obj">>"$tFileorig"
-    done
-  done
+    run get-android-apps listapk "$pkg"
+  done >"$tFileorig"
   $quietp || echo "make $filetoget_stem: list of files to get (exist on the device but not saadir).">&2
   set-complement "$tFileorig" "$tFilelist" >"$filetoget" ||
     { echo "set-complement: failed.">&2;  exit 18;}
@@ -205,18 +210,8 @@ filetoget="$workdir/$filetoget_stem"
       $quietp || echo "No files to get.">&2
     else
       cd apps
-      tFiletoget="$workdir"/tFiletoget
-      trap-addcmd rmtmp "rm -f '$tFiletoget'"
-      trap-calltrap rmtmp
-      for obj in $targets; do
-        $quietp || echo "get $obj files of $filetoget_stem files.">&2
-        fgrep ".$obj" "$filetoget" >"$tFiletoget"
-        mapfile -t files <"$tFiletoget"
-        run get-android-apps $obj "${files[@]}"
-      done
-      rm -f "$tFiletoget"
-      trap-removecmd rmtmp "rm -f '$tFiletoget'"
-      trap-calltrap rmtmp
+      mapfile -t files <"$filetoget"
+      run get-android-apps singleapk "${files[@]}"
       cd ..
     fi
     $dryrunp && rm "$filetoget"
@@ -227,6 +222,7 @@ filetoget="$workdir/$filetoget_stem"
   trap-removecmd rmtmp "rm -f '$tFilelist'"
   trap-removecmd rmtmp "rm -f '$tPkgtochk_last'"
   trap-calltrap rmtmp
+  }
 
   if $listp || $dryrunp; then
     rm "$pkgondev"
@@ -236,6 +232,8 @@ filetoget="$workdir/$filetoget_stem"
     "$dname"/saa-make-list || { echo "saa-make-list: failed.">&2; exit 32;}
   fi
 ) 2>&1 | tee "$log"
+
+
 
 $nologp || copyworktolog
 rm -rf "$workdir"
