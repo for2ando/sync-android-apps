@@ -165,63 +165,63 @@ filetoget="$workdir/$filetoget_stem"
 
 
   in_args apk $targets && {
-  $quietp || { echo; echo "**** compute supplements based on files."; }>&2
-  tPkgtochk_candidate="$workdir"/tPkgtochk_candidate
-  tPkgtochk_last="$workdir"/tPkgtochk_last
-  trap-addcmd rmtmp "rm -f '$tPkgtochk_last'"
-  trap-addcmd rmtmp "rm -f '$tPkgtochk_candidate'"
-  trap-calltrap rmtmp
-  $quietp || echo "make list of exist pkgs both on the device and the saadir.">&2
-  set-product "$pkgondev" "$pkglist" >"$tPkgtochk_candidate" ||
-    { echo "set-product: failed.">&2;  exit 16;}
-  if test -r "$blacklist"; then
-    $quietp || echo "apply blacklist $blacklist to the list.">&2
-    set-complement "$tPkgtochk_candidate" "$blacklist" >"$tPkgtochk_last" ||
-      { echo "set-complement: failed.">&2; rm -f "$tPkgtochk_last"; exit 17;}
-    rm -f "$tPkgtochk_candidate"
-  else
-    mv "$tPkgtochk_candidate" "$tPkgtochk_last"
-  fi
-  trap-removecmd rmtmp "rm -f '$tPkgtochk_candidate'"
-  trap-calltrap rmtmp
-  
-  tFilelist="$workdir"/tFilelist
-  tFileorig="$workdir"/tFileorig
-  trap-addcmd rmtmp "rm -f '$tFilelist'"
-  trap-addcmd rmtmp "rm -f '$tFileorig'"
-  trap-calltrap rmtmp
-  $quietp || echo "make $tFilelist: file-list on the saadir.">&2
-  (cd apps; ls *.apk 2>/dev/null) >"$tFilelist"
-  $quietp || echo "make $tFileorig: file-list on the device.">&2
-  for pkg in $(cat "$tPkgtochk_last"); do
-    run get-android-apps listapk "$pkg"
-  done >"$tFileorig"
-  $quietp || echo "make $filetoget_stem: list of files to get (exist on the device but not saadir).">&2
-  set-complement "$tFileorig" "$tFilelist" >"$filetoget" ||
-    { echo "set-complement: failed.">&2;  exit 18;}
-  
-  if $listp; then
-    echo -------- Files to get:
-    cat "$filetoget"
-    echo -------- end of Files to get:
-    rm "$filetoget"
-  else
-    if test $(cat "$filetoget" | wc -l) -eq 0; then
-      $quietp || echo "No files to get.">&2
+    $quietp || { echo; echo "**** compute supplements based on files."; }>&2
+    tPkgtochk_candidate="$workdir"/tPkgtochk_candidate
+    tPkgtochk_last="$workdir"/tPkgtochk_last
+    trap-addcmd rmtmp "rm -f '$tPkgtochk_last'"
+    trap-addcmd rmtmp "rm -f '$tPkgtochk_candidate'"
+    trap-calltrap rmtmp
+    $quietp || echo "make list of exist pkgs both on the device and the saadir.">&2
+    set-product "$pkgondev" "$pkglist" >"$tPkgtochk_candidate" ||
+      { echo "set-product: failed.">&2;  exit 16;}
+    if test -r "$blacklist"; then
+      $quietp || echo "apply blacklist $blacklist to the list.">&2
+      set-complement "$tPkgtochk_candidate" "$blacklist" >"$tPkgtochk_last" ||
+        { echo "set-complement: failed.">&2; rm -f "$tPkgtochk_last"; exit 17;}
+      rm -f "$tPkgtochk_candidate"
     else
-      cd apps
-      mapfile -t files <"$filetoget"
-      run get-android-apps singleapk "${files[@]}"
-      cd ..
+      mv "$tPkgtochk_candidate" "$tPkgtochk_last"
     fi
-    $dryrunp && rm "$filetoget"
-  fi
-  rm -f "$tPkgtochk_last" "$tFilelist" "$tFileorig"
-  
-  trap-removecmd rmtmp "rm -f '$tFileorig'"
-  trap-removecmd rmtmp "rm -f '$tFilelist'"
-  trap-removecmd rmtmp "rm -f '$tPkgtochk_last'"
-  trap-calltrap rmtmp
+    trap-removecmd rmtmp "rm -f '$tPkgtochk_candidate'"
+    trap-calltrap rmtmp
+    
+    tFilelist="$workdir"/tFilelist
+    tFileorig="$workdir"/tFileorig
+    trap-addcmd rmtmp "rm -f '$tFilelist'"
+    trap-addcmd rmtmp "rm -f '$tFileorig'"
+    trap-calltrap rmtmp
+    $quietp || echo "make $tFilelist: file-list on the saadir.">&2
+    (cd apps; ls *.apk 2>/dev/null) >"$tFilelist"
+    $quietp || echo "make $tFileorig: file-list on the device.">&2
+    for pkg in $(cat "$tPkgtochk_last"); do
+      run get-android-apps listapk "$pkg"
+    done >"$tFileorig"
+    $quietp || echo "make $filetoget_stem: list of files to get (exist on the device but not saadir).">&2
+    set-complement "$tFileorig" "$tFilelist" >"$filetoget" ||
+      { echo "set-complement: failed.">&2;  exit 18;}
+    
+    if $listp; then
+      echo -------- Files to get:
+      cat "$filetoget"
+      echo -------- end of Files to get:
+      rm "$filetoget"
+    else
+      if test $(cat "$filetoget" | wc -l) -eq 0; then
+        $quietp || echo "No files to get.">&2
+      else
+        cd apps
+        mapfile -t files <"$filetoget"
+        run get-android-apps singleapk "${files[@]}"
+        cd ..
+      fi
+      $dryrunp && rm "$filetoget"
+    fi
+    rm -f "$tPkgtochk_last" "$tFilelist" "$tFileorig"
+    
+    trap-removecmd rmtmp "rm -f '$tFileorig'"
+    trap-removecmd rmtmp "rm -f '$tFilelist'"
+    trap-removecmd rmtmp "rm -f '$tPkgtochk_last'"
+    trap-calltrap rmtmp
   }
 
   if $listp || $dryrunp; then
