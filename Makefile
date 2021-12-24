@@ -2,7 +2,7 @@
 .PHONY: install diff prepare
 
 INSTDIR=$(HOME)/bin
-INSTFILES=saa-make-list saa-make-desc saa-copy-saadir saa-get-apps saa-put-apps saa-environ.sh
+INSTFILES=saa-make-list saa-make-desc saa-copy-saadir saa-get-apps saa-put-apps saa-rm-apps saa-environ.sh
 IMPORTDIR1=../copy-android-apps
 IMPORTFILES1=run.sh adbwrappers.sh in_args.sh
 IMPORTDIR2=../trapwrapper

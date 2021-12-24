@@ -2,10 +2,10 @@
 pname=$(basename "$0")
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
-usage="$pname [-h|--help]
+usage="$pname [PackageListFile [...]]
+$pname {-h|--help}
 Features:
   Make a list (text file) of package names and labels of Android applications from '@list' file. 
-  The name of this list file is '@description'.
 Options:
   -h|--help
     This help message is displayed."
@@ -30,13 +30,15 @@ while true; do
   done
 done
 $opterrp && exit 1
-$helpp || test $# -ne 0 && { echo "$usage"; exit;}
-test $# -ne 0 && { echo "$pname: extra arguments.">&2; echo "$usage"; exit 1;}
+$helpp && { echo "$usage"; exit;}
 
-(
-  test "$(basename $(pwd))" = "$appsdir" && cd ..
-  test -r "$pkglist" || { echo "$pkglist: no such a file here.">&2; exit 2;}
-  
-  cat "$pkglist" | get-android-app-name -p - >"$desclist" ||
-    { echo "$pname: abort.">&2; exit 3; }
-)
+test $# -eq 0 && {
+  default="$pkglist"
+  test "$(basename $(pwd))" = "$appsdir" && default="../$default"
+  set "$default"
+}
+
+for list; do 
+  cat "$list" | get-android-app-name -p - ||
+    { echo "$pname: abort.">&2; exit 2; }
+done

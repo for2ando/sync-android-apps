@@ -1,0 +1,74 @@
+#!/bin/sh
+pname=$(basename "$0")
+dname=$(dirname "$0")
+case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+usage="$pname [-q|-v|-n] {-p PkgName|PkgListFile} [...]
+$pname {-h|--help}
+Features:
+  remove the desinated apps from current SAADir (a. k. a. Sync Android Apps
+  Diretory).
+
+Options:
+  PkgListFile
+    a name of text file(s) includes package names to remove.
+  -p|--package PkgName
+    designate the package(s) to remove.
+  -q|--quiet
+    No messages are displayed, except error message.
+  -v|--verbose
+    Additional messages are displayed. It has precedence over
+    -q|--quiet|-s|--silent.
+  -n|--dryrun
+    Only messages displayed, No SAADirectory is made.
+  -h|--help
+    This help message is displayed."
+
+source "$dname/saa-environ.sh"
+
+quietp=false
+verbosep=false
+drurunp=false
+helpp=false
+opterrp=false
+declare -a opts
+declare -a pkgs
+while true; do
+  case "$1" in
+  -|--) break;;
+  --*) opts=("$1"); shift;;
+  -*) for n in $(seq 1 $((${#1}-1))); do opts[$n]="-${1:$n:1}"; done; shift;;
+  *) break;;
+  esac
+  for opt in "${opts[@]}"; do
+    case "$opt" in
+    -p|--packages) pkgs+=("$1"); shift;;
+    -q|--quiet) quietp=true;;
+    -n|--dryrun) dryrunp=true;;
+    -v|--verbose) verbosep=true;;
+    -h|--help) helpp=true;;
+    -*) echo "$opt: unknown option.">&2; opterrp=true;;
+    esac
+  done
+done
+$opterrp && exit 1
+$helpp || test $# -ne 0 && { echo "$usage"; exit;}
+test $# -lt 1 && { echo "$pname: Too few arguments.">&2; exit 1;}
+$verbosep && {
+  quietp=false
+  lnopt=--verbose
+}
+
+remove_package() {
+  pkg="$1"
+  rm -f "apps/$pkg-"*".apk" "apps/$pkg.ab" "apps/$pkg.tar.gz"
+  grep -F -v "$pkg" @list >@newlist && mv @newlist @list
+}
+
+# check SAADir requirement of the current directory
+
+## main
+##
+
+for pkg in "${pkg[@]}" "$@"; do
+  remove_package "$pkg"
+done
