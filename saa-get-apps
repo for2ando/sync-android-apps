@@ -90,9 +90,9 @@ adev="$(_adb devices -l)"
 dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
 if $listp; then
-  logdir="log.d-$dev-$stamp-getlist"
+  logdir="log.d-$stamp-$dev-getlist"
 else
-  logdir="log.d-$dev-$stamp-get"
+  logdir="log.d-$stamp-$dev-get"
 fi
 trap-removecmd rmtmp "rm -rf '$workdir'"
 trap-addcmd rmtmp "$nologp || copyworktolog; rm -rf '$workdir'"
