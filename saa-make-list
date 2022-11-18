@@ -1,17 +1,20 @@
 #!/bin/bash
 pname=$(basename "$0")
 dname=$(dirname "$0")
+source "$dname/saa-environ.sh"
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
-usage="$pname [-h|--help]
+usage="$pname [Options] [PackageDir|AppsDir]
+$pname [-h|--help]
 Features:
   Make a list (text file) of package names of Android applications in the ./apps directory.
   The name of this list file is '@list'.
 Options:
+  -c|--stdout|--to-stdout
+    output to stdout (default: output to $pkglist).
   -h|--help
     This help message is displayed."
 
-source "$dname/saa-environ.sh"
-
+stdoutp=false
 helpp=false
 opterrp=false
 declare -a opts
@@ -24,22 +27,44 @@ while true; do
   esac
   for opt in "${opts[@]}"; do
     case "$opt" in
+    -c|--stdout|--to-stdout)stdoutp=true;;
     -h|--help) helpp=true;;
     -*) echo "$opt: unknown option.">&2; opterrp=true;;
     esac
   done
 done
 $opterrp && exit 1
-$helpp || test $# -ne 0 && { echo "$usage"; exit;}
-test $# -ne 0 && { echo "$pname: extra arguments.">&2; echo "$usage"; exit 1;}
+$helpp && { echo "$usage"; exit;}
 
-(
-  test "$(basename $(pwd))" = apps || {
-    test -d "$appsdir" || { echo "$appsdir: no such a directory here.">&2; exit 2;}
-    cd apps
-  }
-  
-  test -e ../"$pkglist" && rm -f ../"$pkglist"
-  ls *.{apk,ab} | sed 's|-..*\.apk$||;s|\.apk||;;s|\.ab$||' | sort | uniq >../"$pkglist" ||
-    { echo "$pname: abort.">&2; exit 3; }
-)
+test $# -eq 0 && {
+  default="."
+  test "$(basename $(pwd))" = "$appsdir" && default=".."
+  set "$default"
+}
+
+for dir; do
+  (
+    test -d "$dir" || { echo "$dir: no such a directory here.">&2; exit 2;}
+    cd "$dir"
+    test "$(basename $(pwd))" = "$appsdir" || {
+      test -d "$appsdir" || { echo "$appsdir: no such a directory here.">&2; exit 3;}
+      cd apps
+    }
+    
+    $stdoutp || {
+      output="$desclist"
+      outbk="$output.bk"
+      test -e "$output" && mv "$output" "$outbk"
+    }
+    if $stdoutp; then
+      ls *.{apk,ab} 2>/dev/null | sed 's|-..*\.apk$||;s|\.apk||;;s|\.ab$||' | sort | uniq
+    else
+      ls *.{apk,ab} 2>/dev/null | sed 's|-..*\.apk$||;s|\.apk||;;s|\.ab$||' | sort | uniq >../"$pkglist"
+    fi ||
+      {
+        echo "$pname: abort.">&2
+        $stdoutp || mv "$outbk" "$output"
+        exit 4
+      } 
+  )
+done

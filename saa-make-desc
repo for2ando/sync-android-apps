@@ -1,17 +1,19 @@
 #!/bin/bash
 pname=$(basename "$0")
 dname=$(dirname "$0")
+source "$dname/saa-environ.sh"
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
-usage="$pname [PackageListFile [...]]
+usage="$pname [Options] [PackageListFile [...]]
 $pname {-h|--help}
 Features:
   Make a list (text file) of package names and labels of Android applications from '@list' file. 
 Options:
+  -c|--stdout|--to-stdout
+    output to stdout (default: output to $desclist).
   -h|--help
     This help message is displayed."
 
-source "$dname/saa-environ.sh"
-
+stdoutp=false
 helpp=false
 opterrp=false
 declare -a opts
@@ -24,6 +26,7 @@ while true; do
   esac
   for opt in "${opts[@]}"; do
     case "$opt" in
+    -c|--stdout|--to-stdout)stdoutp=true;;
     -h|--help) helpp=true;;
     -*) echo "$opt: unknown option.">&2; opterrp=true;;
     esac
@@ -38,7 +41,30 @@ test $# -eq 0 && {
   set "$default"
 }
 
-for list; do 
-  cat "$list" | get-android-app-name -p - ||
-    { echo "$pname: abort.">&2; exit 2; }
+declare -A outhis
+declare -A bkhis
+for list; do
+  $stdoutp || {
+    output="$(dirname '$list')/$desclist"
+    outbk="$output.bk"
+    test $outhis["$output"] = 1 || {
+      test -e "$output" && mv "$output" "$outbk"
+      touch "$output"
+      outhis["$output"]=1
+      bkhis["$outbk"]=1
+    }
+  }
+  cat "$list" | {
+    if $stdoutp; then
+      get-android-app-name -p -
+    else
+      get-android-app-name -p - >>"$output"
+    fi
+  } ||
+    {
+      echo "$pname: $list: abort.">&2
+      $stdoutp || mv "$outbk" "$output"
+      exit 2
+    }
 done
+rm -f "${!bkhis[@]}"
