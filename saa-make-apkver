@@ -46,8 +46,8 @@ get-apk-versions() {
   while read appid; do
     apkpath="$appspath/$appid"
     for apk in $(ls "$apkpath.apk" "$apkpath-"*".apk" 2>/dev/null); do
-      vername=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionName" | sed -e "s/.*versionName='//" -e "s/' .*//")
-      vercode=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionCode" | sed -e "s/.*versionCode='//" -e "s/' .*//")
+      vername=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionName" | sed -e "s/.*versionName='//" -e "s/'.*//")
+      vercode=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionCode" | sed -e "s/.*versionCode='//" -e "s/'.*//")
       echo "$(basename $apk)	$vername	$vercode"
     done
   done
