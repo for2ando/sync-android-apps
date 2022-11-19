@@ -61,7 +61,7 @@ for list; do
       { echo "$pname: $appspath cannot find.">&2; exit 2; }
 
   $stdoutp || {
-    output="$(dirname '$list')/$verlist"
+    output="$(dirname $list)/$verlist"
     outbk="$output.bk"
     test $outhis["$output"] = 1 || {
       test -e "$output" && mv "$output" "$outbk"
