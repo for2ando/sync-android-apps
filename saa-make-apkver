@@ -6,10 +6,11 @@ case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 usage="$pname [Options] [PackageListFile [...]]
 $pname {-h|--help}
 Features:
-  Make a list (text file) of package names and labels of Android applications from '@list' file. 
+  Make a list (text file) of package names and APK-versions (consists of apkNames and apkCodes) of Android applications from PackageListFile: '$pkglist' file.
+  The default output locations are '$verlist' files on the same directories of designated PackageListFiles.
 Options:
   -c|--stdout|--to-stdout
-    output to stdout (default: output to $desclist).
+    output to stdout (default: output to $verlist).
   -h|--help
     This help message is displayed."
 
@@ -41,11 +42,26 @@ test $# -eq 0 && {
   set "$default"
 }
 
+get-apk-versions() {
+  while read appid; do
+    apkpath="$appspath/$appid"
+    for apk in $(ls "$apkpath.apk" "$apkpath-"*".apk" 2>/dev/null); do
+      vername=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionName" | sed -e "s/.*versionName='//" -e "s/' .*//")
+      vercode=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionCode" | sed -e "s/.*versionCode='//" -e "s/' .*//")
+      echo "$(basename $apk)	$vername	$vercode"
+    done
+  done
+}
+
 declare -A outhis
 declare -A bkhis
 for list; do
+  appspath="$(dirname $list)/$appsdir"
+  test -d "$appspath" ||
+      { echo "$pname: $appspath cannot find.">&2; exit 2; }
+
   $stdoutp || {
-    output="$(dirname '$list')/$desclist"
+    output="$(dirname '$list')/$verlist"
     outbk="$output.bk"
     test $outhis["$output"] = 1 || {
       test -e "$output" && mv "$output" "$outbk"
@@ -56,9 +72,9 @@ for list; do
   }
   cat "$list" | {
     if $stdoutp; then
-      get-android-app-name -p -
+      get-apk-versions
     else
-      get-android-app-name -p - >>"$output"
+      get-apk-versions >>"$output"
     fi
   } ||
     {

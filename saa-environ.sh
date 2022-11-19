@@ -2,6 +2,7 @@ logfilename=log
 pkglist=@list
 blacklist=@blacklist
 desclist=@description
+verlist=@apkver
 pkgondev_stem=@pkgondev
 pkgtoget_stem=@pkgtoget
 filetoget_stem=@filetoget
