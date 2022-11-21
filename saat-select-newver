@@ -1,0 +1,101 @@
+#!/bin/bash
+pname=$(basename "$0")
+dname=$(dirname "$0")
+source "$dname/saa-environ.sh"
+case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+usage="$pname [Options]
+$pname {-h|--help}
+Features:
+  Select one APK has the newest version among list of same APKs.
+  The lines of same APKs must lie next to each other. 
+  The older APKs' lines are not output, one newest APK's line only be output.
+Options:
+  -c|--stdout|--to-stdout (not yet implemented)
+    output to stdout (default: output to $verlist).
+  -h|--help
+    This help message is displayed."
+
+stdoutp=false
+helpp=false
+opterrp=false
+declare -a opts
+while true; do
+  case "$1" in
+  -|--) break;;
+  --*) opts=("$1"); shift;;
+  -*) for n in $(seq 1 $((${#1}-1))); do opts[$n]="-${1:$n:1}"; done; shift;;
+  *) break;;
+  esac
+  for opt in "${opts[@]}"; do
+    case "$opt" in
+    -c|--stdout|--to-stdout) stdoutp=true;;
+    -h|--help) helpp=true;;
+    -*) echo "$opt: unknown option.">&2; opterrp=true;;
+    esac
+  done
+done
+$opterrp && exit 1
+$helpp && { echo "$usage"; exit;}
+
+gawk '
+BEGIN {
+  split("", apklines)   # initialize array w/ empty
+  preapk = ""
+}
+function compare_strings(str1, str2) {
+  if (str1 == str2) { return 0 }
+  if (str1 < str2) { return 1 }
+  return -1
+}
+function compare_dot_separated_versions(ver1, ver2,
+    fields1, fields2, nf1, nf2, nf, largest, ii) {
+  nf1 = split(ver1, fields1, /\./)
+  nf2 = split(ver2, fields2, /\./)
+  nf = nf1
+  if (nf2 < nf) { nf = nf2 }
+  if (nf == 0) { return 0 }
+  for (ii=2; ii<nf; ii++) {
+    if (fields1[ii]+0 < fields2[ii]+0) return -1
+    if (fields1[ii]+0 > fields2[ii]+0) return 1
+  }
+  if (nf1 > nf) return -1
+  if (nf2 > nf) return 1
+  return 0
+}
+function index_largest(strarray, compare,    largest, ii) {
+  if (length(strarray) == 0) return 0
+  largest = 1
+  for (ii=2; ii<length(strarray); ii++) {
+    if (@compare(strarray[ii], strarray[largest]) > 0 ) { largest = ii }
+  }
+  return largest
+}
+{
+  pos = match($1, /\/[^/]*$/)
+  apkname = substr($1, pos+1)
+  if (preapk != "" && apkname != preapk) {
+    split("", verNames)
+    split("", verCodes)
+    for (line in apklines) {
+      nfields = split(line, field, /\t/)
+      #if (nfields != 3) "illegal format of input line."
+      verNames[length(verNames)+1] = field[2]
+      verCodes[length(verCodes)+1] = field[3]
+    }
+    iLargest = index_largest(verNames, "compare_dot_separated_versions")
+    if (iLargest != 0) {
+      result = apklines[iLargest]
+    }
+    iLargest = index_largest(verNames, "compare_strings")
+    if (iLargest != 0) {
+      result = apklines[iLargest]
+    }
+    result = apklines[length(apklines)]
+    print result
+    split("", apklines)
+  }
+  apklines[length(apklines)+1] = $0
+  preapk = apkname
+}
+' "$@"
+
