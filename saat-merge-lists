@@ -1,8 +1,8 @@
 #!/bin/bash
 pname=$(basename "$0")
 dname=$(dirname "$0")
-source "$dname/saa-environ.sh"
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+source "$dname/saa-environ.sh"
 usage="$pname [Options] ApkVerListFile1 ApkVerListFile2 [...]
 $pname {-h|--help}
 Features:
@@ -36,9 +36,9 @@ done
 $opterrp && exit 1
 $helpp && { echo "$usage"; exit;}
 test $# -lt 2 &&
-  { echo "$pname: requires two or more arguments.">&2; exit 1; }
+  { echo "$pname: Requires two or more arguments.">&2; exit 1; }
 
 for file; do
   prefix="$(dirname $file | sed 's/|/\\|/')"
-  sed "s|\$|	$prefix/$appsdir/|" "$file"
+  sed "/^[ \t]*#/b end;s|\$|	$prefix/$appsdir/|;: end" "$file"
 done | sort -k 1 | sed 's/^\(.*\)	\([^	]*\)$/\2\1/'

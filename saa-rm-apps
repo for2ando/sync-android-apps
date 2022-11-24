@@ -2,6 +2,7 @@
 pname=$(basename "$0")
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+source "$dname/saa-environ.sh"
 usage="$pname [-q|-v|-n] {-p PkgName|PkgListFile} [...]
 $pname {-h|--help}
 Features:
@@ -22,8 +23,6 @@ Options:
     Only messages displayed, No SAADirectory is made.
   -h|--help
     This help message is displayed."
-
-source "$dname/saa-environ.sh"
 
 quietp=false
 verbosep=false
@@ -52,7 +51,8 @@ while true; do
 done
 $opterrp && exit 1
 $helpp || test $# -ne 0 && { echo "$usage"; exit;}
-test $# -lt 1 && { echo "$pname: Too few arguments.">&2; exit 1;}
+{ test $# -lt 1 && test -z "${pkgs[@]}";} &&
+  { echo "$pname: Requires one or more arguments, or one or more -p option.">&2; exit 1;}
 $verbosep && {
   quietp=false
   lnopt=--verbose
@@ -69,6 +69,6 @@ remove_package() {
 ## main
 ##
 
-for pkg in "${pkg[@]}" "$@"; do
+for pkg in "${pkgs[@]}" "$@"; do
   remove_package "$pkg"
 done

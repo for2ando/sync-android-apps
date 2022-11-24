@@ -2,28 +2,37 @@
 pname=$(basename "$0")
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+source "$dname/saa-environ.sh"
 usage="$pname [{-s|--saadir} SaaDir] [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--log|--nolog]
 $pname {-h|--help}
 Features:
-  Put (or list) programs (apk files) or data (adb backups or raw /data directory images) files
-  to a remote Android device using adb command.
-  Putting entity (programs and data) have to be stored to the 'apps' directory, which is a child
-  of SaaDir directory specified by -s|--saadir.
-  If a entity is already in a remote Android device, it does not put or list.
+  Put (or list) programs (apk files) or data (adb backups or raw /data
+  directory images) files to a remote Android device using adb command.
+  Putting the entity (programs and data) have to be stored to the 'apps'
+  directory, which is a child of SaaDir directory specified by -s|--saadir.
+  If the entities are already in a remote Android device, they are not
+  putting or listing (The -o|--overwrite option disables this behavior.).
+  And if the entity is already listed in the list: '$blacklist' file, they
+  are not also putting or listing.
 
 Options:
   -s|--saadir SaaDir
     Specify a directory in which putting 
   -t|--target {apk|ab|apk,ab}
     Target entities to put to a remote Android device. Default is apk,ab.
+  -o|--overwrite
+    If the entities are already on a remote Android device, do putting or
+    listing.
   -l|--list
-    Instead of putting entities, List entities to be put to a remote Android device.
+    Instead of putting entities, List entities to be put to a remote Android
+    device.
   -q|--quiet
-    No messages are displayed, except error message.
+    No messages are displayed except error messages.
   -v|--verbose
-    Additional messages are displayed. It has precedence over -q|--quiet|-s|--silent.
+    Additional messages are displayed. It has precedence over -q|--quiet.
   -n|--dryrun
-    Only messages displayed, No SAADirectory is made.
+    Only messages displayed, don't put to entities to the remote Android
+    device.
   --log
     Logging almost all messages to logfiles. It is a default.
   --nolog
@@ -34,7 +43,6 @@ Options:
 source "$dname/run.sh"
 source "$dname/adbwrappers.sh"
 source "$dname/trapwrapper.sh"
-source "$dname/saa-environ.sh"
 printcommandline() {
   echo -n $pname
   test -n "$SAADIR" && echo -n " --saadir '$SAADIR'"
@@ -47,6 +55,7 @@ printcommandline() {
 }
 
 targets='apk,ab'
+overwritep=false
 listp=false
 quietp=false
 verbosep=false
@@ -66,6 +75,7 @@ while true; do
     case "$opt" in
     -s|--saadir) SAADIR="$1"; shift;;
     -t|--target) targets="$1"; shift;;
+    -o|--overwrite) overwritep=true;;
     -l|--list) listp=true;;
     -q|--quiet) quietp=true;;
     -v|--verbose) verbosep=true;;
@@ -88,8 +98,8 @@ trap-open rmtmp $signals
 trap-addcmd rmtmp "$nologp || copyworktolog; rm -rf '$workdir'"
 trap-calltrap rmtmp
 
-adev="$(adb devices -l)"
-dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
+#adev="$(adb devices -l)"
+#dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
 if $listp; then
   logdir="log.d-$stamp-$dev-putlist"
@@ -128,11 +138,15 @@ pkgtoput="$workdir/$pkgtoput_stem"
   get-android-apps list -3 >"$pkgondev" ||
     { echo "get-android-apps -list: failed.">&2; rm -f "$pkgondev"; exit 5;}
   $quietp || echo "make $pkgtoput_stem: list of pkgs to put (exist on the saadir but not on the device).">&2
-  set-complement "$pkglist" "$pkgondev" >"$tPkgtoput_candidate" ||
+  if $overwritep; then
+    cat <(sed '/^[ \t]*#/d' "$pkglist") >"$tPkgtoput_candidate"
+  else
+    set-complement <(sed '/^[ \t]*#/d' "$pkglist") "$pkgondev" >"$tPkgtoput_candidate"
+  fi ||
     { echo "make $pkgtoput: failed.">&2;  exit 6;}
-  if test -r "$blacklist"; then
+  if test -f "$blacklist" && test -r "$blacklist"; then
     $quietp || echo "apply blacklist $blacklist to $pkgtoput_stem.">&2
-    set-complement "$tPkgtoput_candidate" "$blacklist" >"$pkgtoput" ||
+    set-complement "$tPkgtoput_candidate" <(sed '/^[ \t]*#/d' "$blacklist") >"$pkgtoput" ||
       { echo "apply $blacklist: failed.">&2; rm -f "$pkgtoput"; exit 7;}
     rm -f "$tPkgtoput_candidate"
   else
@@ -182,7 +196,7 @@ pkgtoput="$workdir/$pkgtoput_stem"
     rm "$pkgondev"
   else
     cp -p "$pkglist" "$workdir/$pkglist-post"
-    cp -p "$blacklist" "$workdir/$blacklist"
+    test -f "$blacklist" && cp -p "$blacklist" "$workdir/$blacklist"
     "$dname"/saa-make-list ||
       { echo "saa-make-list: failed.">&2; exit 32;}
     #"$dname"/saa-make-desc

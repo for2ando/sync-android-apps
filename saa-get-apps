@@ -2,18 +2,26 @@
 pname=$(basename "$0")
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+source "$dname/saa-environ.sh"
 usage="$pname [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--log|--nolog]
 $pname {-h|--help}
 Features:
-  Get (or list) programs (apk files) and/or data (adb backups or raw /data directory images) files
-  from a remote Android device using adb command.
-  The entity (the programs and the data) are stored to the 'apps' directory, which is a child of
-  current directory.
-  If a entity is already in the 'apps' directory, it does not get or list.
+  Get (or list) programs (apk files) and/or data (adb backups or raw /data
+  directory images) files from a remote Android device using adb command.
+  The entity (the programs and the data) are stored to the 'apps' directory,
+  which is a child of current directory (Such directory is called
+  SAADirectory).
+  If the entities are already in the '$appsdir' directory, they are not
+  getting or listing (The -o|--overwrite disables this behavior.). And if
+  the name of entities are already listed in the list: '$blacklist' file,
+  they are also not getting or listing.
 
 Options:
   -t|--target {apk|ab|apk,ab}
     Target entities to get from a remote Android device. Default is apk,ab.
+  -o|--overwrite
+    If the entities are already on the '$appsdir' directory, do putting or
+    listing.
   -l|--list
     Instead of getting entities, List entities on a remote Android device.
   -q|--quiet
@@ -33,7 +41,6 @@ source "$dname/run.sh"
 source "$dname/adbwrappers.sh"
 source "$dname/in_args.sh"
 source "$dname/trapwrapper.sh"
-source "$dname/saa-environ.sh"
 printcommandline() {
   echo -n $pname
   test -n "$SAADIR" && echo -n " --saadir '$SAADIR'"
@@ -46,6 +53,7 @@ printcommandline() {
 }
 
 targets='apk,ab'
+overwritep=false
 listp=false
 quietp=false
 verbosep=false
@@ -64,6 +72,7 @@ while true; do
   for opt in "${opts[@]}"; do
     case "$opt" in
     -t|--target) targets="$1"; shift;;
+    -o|--overwrite) overwritep=true;;
     -l|--list) listp=true; nologp=true;;
     -q|--quiet) quietp=true;;
     -v|--verbose) verbosep=true;;
@@ -130,11 +139,15 @@ filetoget="$workdir/$filetoget_stem"
   get-android-apps list -3 >"$pkgondev" ||
     { echo "get-android-apps -list: failed.">&2; rm -f "$pkgondev"; exit 5;}
   $quietp || echo "make $pkgtoget_stem: list of pkgs to get (exist on the device but not saadir).">&2
-  set-complement "$pkgondev" "$pkglist" >"$tPkgtoget_candidate" ||
+  if $overwritep; then
+  cat "$pkgondev" >"$tPkgtoget_candidate"
+  else
+    set-complement "$pkgondev" <(sed '/^[ \t]*#/d' "$pkglist") >"$tPkgtoget_candidate"
+  fi ||
     { echo "make $pkgtoget: failed.">&2;  exit 6;}
-  if test -r "$blacklist"; then
+  if test -f "$blacklist" && test -r "$blacklist"; then
     $quietp || echo "apply blacklist $blacklist to $pkgtoget_stem.">&2
-    set-complement "$tPkgtoget_candidate" "$blacklist" >"$pkgtoget" ||
+    set-complement "$tPkgtoget_candidate" <(sed '/^[ \t]*#/d' "$blacklist") >"$pkgtoget" ||
       { echo "apply $blacklist: failed.">&2; rm -f "$pkgtoget"; exit 7;}
     rm -f "$tPkgtoget_candidate"
   else
@@ -172,11 +185,11 @@ filetoget="$workdir/$filetoget_stem"
     trap-addcmd rmtmp "rm -f '$tPkgtochk_candidate'"
     trap-calltrap rmtmp
     $quietp || echo "make list of exist pkgs both on the device and the saadir.">&2
-    set-product "$pkgondev" "$pkglist" >"$tPkgtochk_candidate" ||
+    set-product "$pkgondev" <(sed '/^[ \t]*#/d' "$pkglist") >"$tPkgtochk_candidate" ||
       { echo "set-product: failed.">&2;  exit 16;}
-    if test -r "$blacklist"; then
+    if test -f "$blacklist" && test -r "$blacklist"; then
       $quietp || echo "apply blacklist $blacklist to the list.">&2
-      set-complement "$tPkgtochk_candidate" "$blacklist" >"$tPkgtochk_last" ||
+      set-complement "$tPkgtochk_candidate" <(sed '/^[ \t]*#/d' "$blacklist") >"$tPkgtochk_last" ||
         { echo "set-complement: failed.">&2; rm -f "$tPkgtochk_last"; exit 17;}
       rm -f "$tPkgtochk_candidate"
     else
@@ -197,7 +210,11 @@ filetoget="$workdir/$filetoget_stem"
       run get-android-apps listapk "$pkg"
     done >"$tFileorig"
     $quietp || echo "make $filetoget_stem: list of files to get (exist on the device but not saadir).">&2
-    set-complement "$tFileorig" "$tFilelist" >"$filetoget" ||
+    if $overwritep; then
+      cat "$tFileorig" >"$filetoget"
+    else
+      set-complement "$tFileorig" "$tFilelist" >"$filetoget"
+    fi ||
       { echo "set-complement: failed.">&2;  exit 18;}
     
     if $listp; then
@@ -228,7 +245,7 @@ filetoget="$workdir/$filetoget_stem"
     rm "$pkgondev"
   else
     cp -p "$pkglist" "$workdir/$pkglist-post"
-    test -r "$blacklist" && cp -p "$blacklist" "$workdir/$blacklist"
+    test -f "$blacklist" && cp -p "$blacklist" "$workdir/$blacklist"
     "$dname"/saa-make-list || { echo "saa-make-list: failed.">&2; exit 32;}
   fi
 ) 2>&1 | tee "$log"

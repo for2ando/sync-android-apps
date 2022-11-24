@@ -1,8 +1,8 @@
 #!/bin/bash
 pname=$(basename "$0")
 dname=$(dirname "$0")
-source "$dname/saa-environ.sh"
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+source "$dname/saa-environ.sh"
 usage="$pname [Options] [PackageListFile [...]]
 $pname {-h|--help}
 Features:
@@ -41,6 +41,16 @@ test $# -eq 0 && {
   set "$default"
 }
 
+get_android_app_name() {
+  while IFS= read appid; do
+    if expr "$appid" : '^[ 	]*#' >/dev/null; then
+      echo "$appid"
+    else
+      get-android-app-name -p "$appid"
+    fi
+  done
+}
+
 declare -A outhis
 declare -A bkhis
 for list; do
@@ -56,9 +66,9 @@ for list; do
   }
   cat "$list" | {
     if $stdoutp; then
-      get-android-app-name -p -
+      get_android_app_name
     else
-      get-android-app-name -p - >>"$output"
+      get_android_app_name >>"$output"
     fi
   } ||
     {

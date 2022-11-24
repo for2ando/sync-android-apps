@@ -1,6 +1,7 @@
 logfilename=log
 pkglist=@list
 blacklist=@blacklist
+whitelist=@whitelist
 desclist=@description
 verlist=@apkver
 pkgondev_stem=@pkgondev

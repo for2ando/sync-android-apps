@@ -1,8 +1,8 @@
 #!/bin/bash
 pname=$(basename "$0")
 dname=$(dirname "$0")
-source "$dname/saa-environ.sh"
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+source "$dname/saa-environ.sh"
 usage="$pname [Options] [PackageDir|AppsDir]
 $pname [-h|--help]
 Features:
@@ -42,6 +42,11 @@ test $# -eq 0 && {
   set "$default"
 }
 
+make_pkglist() {
+  sed -n '/^[ \t]*#/p'
+  ls *.{apk,ab} 2>/dev/null | sed 's|-..*\.apk$||;s|\.apk||;;s|\.ab$||' | sort | uniq
+}
+
 for dir; do
   (
     test -d "$dir" || { echo "$dir: no such a directory here.">&2; exit 2;}
@@ -56,15 +61,24 @@ for dir; do
       outbk="$output.bk"
       test -e "$output" && mv "$output" "$outbk"
     }
-    if $stdoutp; then
-      ls *.{apk,ab} 2>/dev/null | sed 's|-..*\.apk$||;s|\.apk||;;s|\.ab$||' | sort | uniq
+    tmpf="$(mktemp)"
+    if test -f "../$pkglist"; then
+      cat "../$pkglist"
     else
-      ls *.{apk,ab} 2>/dev/null | sed 's|-..*\.apk$||;s|\.apk||;;s|\.ab$||' | sort | uniq >../"$pkglist"
+      cat /dev/null
+    fi >"$tmpf"
+    cat "$tmpf" | 
+    if $stdoutp; then
+      make_pkglist
+    else
+      make_pkglist >"../$pkglist"
     fi ||
       {
         echo "$pname: abort.">&2
         $stdoutp || mv "$outbk" "$output"
+        rm -f "$tmpf"
         exit 4
-      } 
+      }
+    rm -f "$tmpf"
   )
 done

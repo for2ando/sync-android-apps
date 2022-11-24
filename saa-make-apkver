@@ -1,8 +1,8 @@
 #!/bin/bash
 pname=$(basename "$0")
 dname=$(dirname "$0")
-source "$dname/saa-environ.sh"
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
+source "$dname/saa-environ.sh"
 usage="$pname [Options] [PackageListFile [...]]
 $pname {-h|--help}
 Features:
@@ -43,13 +43,17 @@ test $# -eq 0 && {
 }
 
 get-apk-versions() {
-  while read appid; do
-    apkpath="$appspath/$appid"
-    for apk in $(ls "$apkpath.apk" "$apkpath-"*".apk" 2>/dev/null); do
-      vername=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionName" | sed -e "s/.*versionName='//" -e "s/'.*//")
-      vercode=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionCode" | sed -e "s/.*versionCode='//" -e "s/'.*//")
-      echo "$(basename $apk)	$vername	$vercode"
-    done
+  while IFS= read appid; do
+    if expr "$appid" : '^[ 	]*#' >/dev/null; then
+      echo "$appid"
+    else
+      apkpath="$appspath/$appid"
+      for apk in $(ls "$apkpath.apk" "$apkpath-"*".apk" 2>/dev/null); do
+        vername=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionName" | sed -e "s/.*versionName='//" -e "s/'.*//")
+        vercode=$(aapt2 dump badging "$(cygpath -w $apk)" 2>/dev/null | grep "versionCode" | sed -e "s/.*versionCode='//" -e "s/'.*//")
+        echo "$(basename $apk)	$vername	$vercode"
+      done
+    fi
   done
 }
 
