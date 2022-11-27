@@ -3,6 +3,7 @@ pname=$(basename "$0")
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 source "$dname/saa-environ.sh"
+xpager=$(which pageless 2>/dev/null || ${PAGER:-less})
 usage="$pname [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--log|--nolog]
 $pname {-h|--help}
 Features:
@@ -85,7 +86,7 @@ while true; do
   done
 done
 $opterrp && exit 1
-$helpp || test $# -ne 0 && { echo "$usage"; exit;}
+$helpp || test $# -ne 0 && { echo "$usage" | $xpager; exit;}
 targets=$(IFS=$' \t\n,'; echo $targets)
 
 #signals='EXIT SIGHUP SIGINT SIGQUIT SIGTERM ERR'
@@ -114,6 +115,7 @@ fi
 pkgondev="$workdir/$pkgondev_stem"
 pkgtoget="$workdir/$pkgtoget_stem"
 filetoget="$workdir/$filetoget_stem"
+$overwritep && { gotten="$workdir/$gotten_stem"; >"$gotten";}
 
 
 (
@@ -136,17 +138,17 @@ filetoget="$workdir/$filetoget_stem"
   trap-addcmd rmtmp "rm -f '$tPkgtoget_candidate'"
   trap-calltrap rmtmp
   $quietp || echo "make $pkgondev_stem: pkgs-list on the device.">&2
-  get-android-apps list -3 >"$pkgondev" ||
-    { echo "get-android-apps -list: failed.">&2; rm -f "$pkgondev"; exit 5;}
+  dryrunp=false run get-android-apps list -3 >"$pkgondev" ||
+    { echo "'get-android-apps list': failed.">&2; rm -f "$pkgondev"; exit 5;}
   $quietp || echo "make $pkgtoget_stem: list of pkgs to get (exist on the device but not saadir).">&2
   if $overwritep; then
-  cat "$pkgondev" >"$tPkgtoget_candidate"
+    cat "$pkgondev" >"$tPkgtoget_candidate"
   else
     set-complement "$pkgondev" <(sed '/^[ \t]*#/d' "$pkglist") >"$tPkgtoget_candidate"
   fi ||
     { echo "make $pkgtoget: failed.">&2;  exit 6;}
   if test -f "$blacklist" && test -r "$blacklist"; then
-    $quietp || echo "apply blacklist $blacklist to $pkgtoget_stem.">&2
+    $quietp || echo "apply blacklist: $blacklist to $pkgtoget_stem.">&2
     set-complement "$tPkgtoget_candidate" <(sed '/^[ \t]*#/d' "$blacklist") >"$pkgtoget" ||
       { echo "apply $blacklist: failed.">&2; rm -f "$pkgtoget"; exit 7;}
     rm -f "$tPkgtoget_candidate"
@@ -168,7 +170,9 @@ filetoget="$workdir/$filetoget_stem"
       cd apps
       for obj in $targets; do
         $quietp || echo "get $obj files of $pkgtoget_stem pkgs.">&2
-        run get-android-apps $obj $(cat "$pkgtoget")
+        $dryrunp && dryrun_opt=' --dryrun' || dryrun_opt=
+        dryrunp=false run get-android-apps${dryrun_opt}${gotten:+ -g "$gotten"} $obj $(cat "$pkgtoget") ||
+          { test $? = 255 && break;}
       done
       cd ..
     fi
@@ -188,7 +192,7 @@ filetoget="$workdir/$filetoget_stem"
     set-product "$pkgondev" <(sed '/^[ \t]*#/d' "$pkglist") >"$tPkgtochk_candidate" ||
       { echo "set-product: failed.">&2;  exit 16;}
     if test -f "$blacklist" && test -r "$blacklist"; then
-      $quietp || echo "apply blacklist $blacklist to the list.">&2
+      $quietp || echo "apply blacklist: $blacklist to the list.">&2
       set-complement "$tPkgtochk_candidate" <(sed '/^[ \t]*#/d' "$blacklist") >"$tPkgtochk_last" ||
         { echo "set-complement: failed.">&2; rm -f "$tPkgtochk_last"; exit 17;}
       rm -f "$tPkgtochk_candidate"
@@ -207,11 +211,11 @@ filetoget="$workdir/$filetoget_stem"
     (cd apps; ls *.apk 2>/dev/null) >"$tFilelist"
     $quietp || echo "make $tFileorig: file-list on the device.">&2
     for pkg in $(cat "$tPkgtochk_last"); do
-      run get-android-apps listapk "$pkg"
+      dryrunp=false run get-android-apps listapk "$pkg"
     done >"$tFileorig"
     $quietp || echo "make $filetoget_stem: list of files to get (exist on the device but not saadir).">&2
     if $overwritep; then
-      cat "$tFileorig" >"$filetoget"
+      set-complement "$tFileorig" "$gotten" >"$filetoget"
     else
       set-complement "$tFileorig" "$tFilelist" >"$filetoget"
     fi ||
@@ -228,7 +232,8 @@ filetoget="$workdir/$filetoget_stem"
       else
         cd apps
         mapfile -t files <"$filetoget"
-        run get-android-apps singleapk "${files[@]}"
+        $dryrunp && dryrun_opt=' --dryrun' || dryrun_opt=
+        dryrunp=false run get-android-apps${dryrun_opt}${gotten:+ -g "$gotten"} singleapk "${files[@]}"
         cd ..
       fi
       $dryrunp && rm "$filetoget"

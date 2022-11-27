@@ -2,3 +2,4 @@ adbwrappers.sh
 in_args.sh
 run.sh
 trapwrapper.sh
+testbed*

@@ -3,6 +3,7 @@ pname=$(basename "$0")
 dname=$(dirname "$0")
 case "$dname" in /*);; *) dname="$(pwd)/$dname";; esac
 source "$dname/saa-environ.sh"
+xpager=$(which pageless 2>/dev/null || ${PAGER:-less})
 usage="$pname [{-s|--saadir} SaaDir] [{-t|--target} {apk|ab|apk,ab}] [-l|--list|-q|--quiet|-v|--verbose|-n|--dryrun|--log|--nolog]
 $pname {-h|--help}
 Features:
@@ -88,7 +89,7 @@ while true; do
   done
 done
 $opterrp && exit 1
-$helpp || test $# -ne 0 && { echo "$usage"; exit;}
+$helpp || test $# -ne 0 && { echo "$usage" | $xpager; exit;}
 targets=$(IFS=$' \t\n,'; echo $targets)
 
 #signals='EXIT SIGHUP SIGINT SIGQUIT SIGTERM ERR'
@@ -98,14 +99,17 @@ trap-open rmtmp $signals
 trap-addcmd rmtmp "$nologp || copyworktolog; rm -rf '$workdir'"
 trap-calltrap rmtmp
 
-#adev="$(adb devices -l)"
-#dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
+adev="$(adb devices -l)"
+dev=$(echo "$adev" | adb-parsedev -b -o -r -s -u model) || exit 11
 stamp=$(date +%Y%m%d-%H%M%S)
 if $listp; then
   logdir="log.d-$stamp-$dev-putlist"
 else
   logdir="log.d-$stamp-$dev-put"
 fi
+trap-removecmd rmtmp "rm -rf '$workdir'"
+trap-addcmd rmtmp "$nologp || copyworktolog; rm -rf '$workdir'"
+trap-calltrap rmtmp
 if $nologp; then
   log=/dev/null
 else
@@ -145,7 +149,7 @@ pkgtoput="$workdir/$pkgtoput_stem"
   fi ||
     { echo "make $pkgtoput: failed.">&2;  exit 6;}
   if test -f "$blacklist" && test -r "$blacklist"; then
-    $quietp || echo "apply blacklist $blacklist to $pkgtoput_stem.">&2
+    $quietp || echo "apply blacklist: $blacklist to $pkgtoput_stem.">&2
     set-complement "$tPkgtoput_candidate" <(sed '/^[ \t]*#/d' "$blacklist") >"$pkgtoput" ||
       { echo "apply $blacklist: failed.">&2; rm -f "$pkgtoput"; exit 7;}
     rm -f "$tPkgtoput_candidate"
@@ -180,12 +184,12 @@ pkgtoput="$workdir/$pkgtoput_stem"
           done
           ;;
         *)
-          #echo "workdir=[$workdir]"
-          #ls -d "$workdir"
           files=$(sed "s|^|$appsdir_escaped/|;s|$|.$obj|" "$pkgtoput")
           ;;
         esac
-        run put-android-apps $obj $files
+        $dryrunp && dryrun_opt=' --dryrun' || dryrun_opt=
+        dryrunp=false run put-android-apps${dryrun_opt} $obj $files || { test $? = 255 && break;} ||
+          { test $? = 255 && break;}
       done
       
       $dryrunp && rm "$pkgtoput"

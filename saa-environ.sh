@@ -9,6 +9,7 @@ pkgtoget_stem=@pkgtoget
 filetoget_stem=@filetoget
 pkgtoput_stem=@pkgtoput
 filetoput_stem=@filetoput
+gotten_stem=@gotten
 appsdir=apps
 
 copyworktolog() {
